@@ -1,66 +1,82 @@
-# Retinal Vascular Identification — Project Roadmap
+# Retinal Vascular Identification — Project Roadmap (Capstone I & II)
 
-## โปรเจกต์จบ: ระบบยืนยันตัวบุคคลจากลวดลายหลอดเลือดจอตา
-- อาจารย์ที่ปรึกษา: Isoon Kanjanasurat, Nitjaree Satayarak
-- ทีม: ดวิษ (Classical Pipeline) + วิวรรธน์ (Deep Learning Pipeline)
-- ต่อยอดจาก: Kanjanasurat et al. (2020) — Delaunay Triangle + Optic Disc Retinal Vascular Pattern
+## โปรเจกต์จบ: ระบบยืนยันตัวบุคคลจากลวดลายหลอดเลือดจอประสาทตา
+- **อาจารย์ที่ปรึกษา**: อ. อิสูรย์ กาญจนสุรัตน์ (Isoon Kanjanasurat), ดร. นิจจารีย์ สัตยารักษ์ (Nitjaree Satayarak)
+- **คณะผู้พัฒนา**:
+  - ดวิษ (Classical Image Processing Pipeline & Keypoint Matching)
+  - วิวรรธน์ (Deep Learning Pipeline, Biometrics Matching & System Integration)
+- **อ้างอิงและต่อยอดจาก**: Kanjanasurat et al. (2020) — *Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern*
 
-## Technical Decisions (เคาะแล้ว)
-- **Framework**: PyTorch + `segmentation_models_pytorch` (smp)
-- **Architecture**: U-Net with Pretrained ResNet-34 Encoder
-- **Image sizing**: Resize 512×512 (ไม่ใช้ Patch-based ในรอบแรก)
-- **Loss function**: BCE + Dice Loss (Combined)
-- **Training hardware**: Google Colab / Kaggle (Free GPU)
-- **Datasets**: DRIVE + STARE + HRF (เทรน/ประเมิน vessel), HRF (ประเมิน OD/Fovea)
+---
 
-## Interface Agreement (ใช้ร่วมกัน 2 สาย)
-```python
-# ดวิษเขียน, วิวรรธน์เอาไปใช้
-def find_optic_disk(vessel_map: np.ndarray, green_image: np.ndarray) -> tuple[int, int]:
-    # vessel_map: binary 2D array ขนาดเท่าภาพต้นฉบับ (0/1, 1=vessel)
-    # green_image: green channel ขนาดเดียวกัน
-    # return: (x, y) พิกัดจุดศูนย์กลาง optic disk
+## 1. Technical Decisions & System Specifications
 
-def find_fovea(vessel_map: np.ndarray, optic_disk_xy: tuple[int, int]) -> tuple[int, int]:
-    # return: (x, y) พิกัดจุดศูนย์กลาง fovea
-```
-**สำคัญ**: vessel_map ที่ส่งเข้าฟังก์ชันต้อง resize กลับเป็นขนาดต้นฉบับก่อน
+- **Framework**: PyTorch + `segmentation_models_pytorch` (smp) + Albumentations
+- **Architecture**: U-Net with Pretrained ResNet-34 / ResNet-50 Encoder
+- **Loss Function**: Combined Loss (BCEWithLogitsLoss 0.5 + DiceLoss 0.5)
+- **Post-processing & Inference**:
+  - Probability Threshold: 0.60 (Validated via ROC & Youden's J Analysis)
+  - Test-Time Augmentation (TTA): Horizontal Flip Averaging (+0.56% Dice boost)
+  - Morphological Filtering: Small component noise removal (< 25px) + Hole filling
+- **Landmark Localization**:
+  - Optic Disc: Vessel tree convergence + green channel brightness prior
+  - Fovea: Macular vessel sparsity + anatomical distance prior relative to OD
+- **Biometric Matching**:
+  - Feature Points: Vascular Bifurcations & Crossovers via Rutovitz Crossing Number
+  - Graph Topology: Delaunay Triangulation restricted to peri-papillary zone
+  - Invariant Descriptors: Adjacent triangle area ratios + internal angle preservation
+- **Datasets**:
+  - Vessel Segmentation: DRIVE (40) + STARE (20) + HRF (45)
+  - Localization Benchmark: IDRiD C. Localization Testing Set (103)
+  - Biometric Matching Benchmark: DRIVE Identity Pairs (20 Genuine, 190 Impostor)
 
-## 7-Week Roadmap (ฝั่ง DL — วิวรรธน์)
+---
 
-### Week 1: Project Setup
-- สร้าง repo structure, .gitignore, requirements.txt
-- สร้าง interface stubs (find_optic_disk, find_fovea)
-- สร้าง evaluation/metrics.py (Accuracy, Sensitivity, Specificity, Euclidean distance)
-- สร้าง sanity check script โหลดภาพ DRIVE แสดงผล
+## 2. Milestone Progress & Execution Summary (Capstone I)
 
-### Week 2: Data Pipeline & Preprocessing
-- เขียน dl_pipeline/dataset.py — PyTorch Dataset class
-- รวม DRIVE + STARE + HRF, normalize 0-1, resize 512×512
-- แบ่ง train/val/test (แบ่งระดับภาพก่อน ไม่ใช่ระดับ pixel)
-- Data augmentation: HorizontalFlip, VerticalFlip, RandomRotate90, RandomBrightnessContrast
+### Phase 1: Environment & Dataset Pipeline (Completed)
+- โครงสร้างโปรเจกต์แบบ Clean Architecture พร้อม Strict Type Hinting
+- Data utilities จับคู่ภาพและ Mask (DRIVE, STARE, HRF) ด้วย Hash Indexing
+- Dataset Pipeline และ Albumentations data augmentation
 
-### Week 3: Model & Training Pipeline
-- เขียน dl_pipeline/model.py — smp.Unet(encoder_name='resnet34', encoder_weights='imagenet', ...)
-- เขียน dl_pipeline/train.py — training loop, BCE+Dice loss, Adam optimizer
-- เทรนรอบแรกบน Colab, เช็คว่าไม่ predict ภาพดำล้วน
+### Phase 2: Deep Learning Vessel Segmentation (Completed)
+- โมเดล U-Net ResNet-34 (Pretrained ImageNet)
+- เทรนโมเดลบน Google Colab (Tesla T4 GPU)
+- ผลการประเมิน: DRIVE Dice = 0.7848, AUC = 0.9652, Accuracy = 96.14%
 
-### Week 4: Tuning & Vessel Segmentation Evaluation
-- จูน lr, batch_size, epochs, threshold
-- คำนวณ Accuracy/Sensitivity/Specificity บน test set เทียบ ground truth
-- ปิด Milestone: Vessel Extraction (DL)
+### Phase 3: Model Improvement & Hyperparameter Optimization (Completed)
+- Threshold Optimization: ขยับจาก 0.50 เป็น 0.60 เพิ่ม Specificity เป็น 98.66%
+- Test-Time Augmentation (TTA) เพิ่ม Dice บน Validation set เป็น 0.7324
+- พัฒนา `dl_pipeline/postprocess.py` ลบจุดรบกวนขยะรอบจอประสาทตา
 
-### Week 5: Optic Disk Localization (DL Front-end)
-- รับฟังก์ชัน find_optic_disk() จากดวิษ
-- ป้อน vessel_map (resize กลับขนาดจริง) + green_image เข้าไป
-- คำนวณ Euclidean distance เทียบ ground truth HRF
+### Phase 4: Classical Pipeline Integration & Formal Localization Benchmark (Completed)
+- นำเข้าโมดูล `classical_pipeline/` (ดวิษ) และตั้งสัญญา Interface แบบสมบูรณ์
+- ประเมินผลบน IDRiD Testing Set (103 ภาพความละเอียด 4288x2848):
+  - **Optic Disc (OD) Success Rate**: **99.03%** (Mean Error: 68.18 px หรือ 1.59% ของความกว้างภาพ)
+  - **Fovea Success Rate**: **94.17%** (Mean Error: 108.11 px หรือ 2.52% ของความกว้างภาพ)
 
-### Week 6: Fovea Localization (DL Front-end)
-- รับฟังก์ชัน find_fovea() จากดวิษ
-- ป้อน vessel_map + optic_disk_xy ที่ได้จาก Week 5
-- คำนวณ Euclidean distance เทียบ ground truth HRF
+### Phase 5: Biometric Identity Matching Engine (Completed)
+- พัฒนาโมดูล `matching/`:
+  - `skeleton.py`: Zhang-Suen / morphological thinning
+  - `bifurcation.py`: Rutovitz Crossing Number ตรวจหาจุดแตกแขนงและจุดตัด
+  - `triangulation.py`: Delaunay Triangulation + Multi-attribute Geometric Invariants
+  - `matcher.py`: Invariant matching and identity verification
+- ผลการประเมินบน DRIVE Benchmark:
+  - **Equal Error Rate (EER)**: **4.34%**
+  - **Verification Accuracy @ EER**: **96.19%**
+  - **Optimal Threshold**: **0.200**
 
-### Week 7: Comparison & Report
-- ตาราง Classical vs DL (vessel accuracy, OD success rate, fovea success rate)
-- วิเคราะห์จุดที่ DL ดี/ไม่ดีกว่า Classical
-- เขียนรายงานความก้าวหน้า Capstone I
+### Phase 6: Interactive Demo Application (Completed)
+- พัฒนา Web Application ผ่าน Gradio (`demo/app.py`):
+  - Tab 1: Vessel Segmentation (Overlay + Heatmap)
+  - Tab 2: Landmark Detection (OD + Fovea Coordinates)
+  - Tab 3: Biometric Identity Matching (Delaunay Graph + Similarity Verification)
+
+---
+
+## 3. Capstone II Future Directions (เทอมหน้า)
+
+1. **Learned Feature Descriptors**: พัฒนา Contrastive Learning / Siamese Network หรือ GNN บน Vessel Graph แทน Handcrafted Invariant Ratios
+2. **Advanced Segmentation Backbone**: อัปเกรดเป็น Attention U-Net / Swin-UNet และทดสอบ Patch-based 1024x1024
+3. **Cross-Database Domain Adaptation**: ทดสอบข้าม Dataset หลากหลายเชื้อชาติ (เช่น CHASE_DB1, ARIA)
+4. **Hardware Deployment**: ย่อส่วนโมเดลและพัฒนา Edge Device หรือระบบ Mobile Authentication

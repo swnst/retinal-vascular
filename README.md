@@ -6,17 +6,17 @@
 - **คณะผู้พัฒนา**:
   - ดวิษ (Classical Image Processing Pipeline & Keypoint Matching)
   - วิวรรธน์ (Deep Learning Pipeline: Vessel Segmentation & Feature Extraction)
-- **อ้างอิงและต่อยอดจาก**: Kanjanasurat et al. (2020) — *Delaunay Triangle + Optic Disc Retinal Vascular Pattern*
+- **อ้างอิงและต่อยอดจาก**: Kanjanasurat et al. (2020) — *Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern*
 
 ---
 
-## 1. ภาพรวมโปรเจกต์ (Project Overview)
+## 1. ภาพรวมระบบ (System Architecture)
 
-ระบบนี้มีเป้าหมายในการระบุและยืนยันตัวบุคคลด้วยลักษณะเฉพาะของหลอดเลือดบนจอตา (Retinal Blood Vessels) โดยผสมผสานทั้งแนวทาง Classical Computer Vision และ Deep Learning (U-Net with Pretrained ResNet-34 Encoder) เพื่อ:
-1. ทำการแบ่งส่วนหลอดเลือด (Vessel Segmentation) จากภาพถ่ายจอประสาทตา (Fundus Images)
-2. หาตำแหน่งจุดอ้างอิงสำคัญ ได้แก่ จานประสาทตา (Optic Disk - OD) และจุดรับภาพชัด (Fovea)
-3. สกัดจุดแยกและจุดเชื่อมต่อของหลอดเลือด (Bifurcations & Crossover Points)
-4. สร้าง Topological Graph ด้วย Delaunay Triangulation เพื่อใช้จับคู่และยืนยันตัวตน (Authentication / Identification)
+ระบบทำการยืนยันตัวบุคคลแบบ End-to-End ตั้งแต่การรับภาพถ่ายจอประสาทตาจนถึงการจับคู่ชีวมิติ:
+1. **Vessel Segmentation (Deep Learning)**: U-Net with ResNet-34 Encoder ทำนายลวดลายหลอดเลือดอย่างแม่นยำ พร้อม Test-Time Augmentation (TTA) และ Morphological Post-processing
+2. **Anatomical Landmarks Localization (Classical Pipeline)**: ตรวจหาพิกัดกึ่งกลางจานประสาทตา (Optic Disc) และจุดรับภาพชัด (Fovea) ด้วยการวิเคราะห์การรวมตัวของหลอดเลือดและความสว่าง
+3. **Keypoint Extraction (Topology)**: สกัดจุดแยก (Bifurcations) และจุดตัด (Crossovers) ด้วย Rutovitz Crossing Number
+4. **Delaunay Triangulation & Invariant Matching**: สร้างโครงข่ายสามเหลี่ยม Delaunay รอบ Optic Disc และคำนวณ Multi-attribute Geometric Invariants (Area Ratios + Internal Angles) เพื่อใช้จับคู่ยืนยันตัวตน
 
 ---
 
@@ -24,115 +24,84 @@
 
 ```text
 retinal-vascular/
-├── classical_pipeline/         # งานฝั่ง Classical Image Processing (ดวิษ)
-│   ├── __init__.py
-│   └── localization.py         # ฟังก์ชันระบุพิกัด Optic Disk และ Fovea
-├── dl_pipeline/                # งานฝั่ง Deep Learning Pipeline (วิวรรธน์)
-│   ├── __init__.py
-│   ├── data_utils.py           # Helper สำหรับ scan/parse file path ของ DRIVE, STARE, HRF
+├── classical_pipeline/         # อัลกอริทึมหาตำแหน่งจุดสำคัญ (ดวิษ)
+│   ├── localization_api.py     # Unified API สำหรับเชื่อมต่อ (find_optic_disk, find_fovea)
+│   ├── optic_disc_localization.py
+│   └── fovea_localization.py
+├── dl_pipeline/                # Deep Learning Pipeline (วิวรรธน์)
 │   ├── dataset.py              # PyTorch Dataset รองรับ Augmentation & Multi-dataset
-│   ├── model.py                # โมเดล Segmentation (U-Net + ResNet-34)
-│   ├── train.py                # Training script (BCE + Dice Loss)
-│   └── predict.py              # Inference script สกัด vessel map
-├── evaluation/                 # การประเมินผลและการวัดประสิทธิภาพ
-│   ├── __init__.py
-│   └── metrics.py              # Pixel metrics (Acc, Sens, Spec) & Localization Euclidean distance
-├── notebooks/                  # สคริปต์ทดสอบและ Sanity check
-│   ├── 00_sanity_check.py      # ตรวจสอบการโหลดภาพและแสดง Green channel
-│   └── 01_data_check.py        # ตรวจสอบ DataLoader, Dataset และ Data Augmentation
-├── data/                       # จัดเก็บ Dataset (DRIVE, STARE, HRF) — Gitignored
-├── ROADMAP.md                  # แผนการดำเนินงาน 7 สัปดาห์
-├── requirements.txt            # รายการ Dependencies
+│   ├── model.py                # U-Net Architecture (ResNet-34 / ResNet-50)
+│   ├── train.py                # Training Engine (BCE + Dice Loss)
+│   ├── predict.py              # High-Precision Inference พร้อม TTA
+│   └── postprocess.py          # Morphological Filtering กำจัด Noise
+├── matching/                   # ระบบชีวมิติ Identity Matching (วิวรรธน์)
+│   ├── skeleton.py             # Vessel Thinning / Skeletonization
+│   ├── bifurcation.py          # ตรวจหา Bifurcations & Crossovers ผ่าน Crossing Number
+│   ├── triangulation.py        # Delaunay Triangulation & Geometric Invariants
+│   └── matcher.py              # Template Extraction & Invariant Matching Engine
+├── evaluation/                 # การทดสอบและประเมินผลเชิงปริมาณ
+│   ├── evaluate_vessel.py      # วัดผล Vessel Segmentation (Dice, AUC, Acc, Sens, Spec)
+│   ├── evaluate_localization.py# Benchmark IDRiD วัดความคลาดเคลื่อนพิกัด OD & Fovea
+│   ├── evaluate_matching.py    # Benchmark DRIVE คำนวณ EER, FAR, FRR, ROC
+│   └── threshold_analysis.py   # วิเคราะห์ Optimal Threshold ด้วย Youden's J Index
+├── demo/                       # Interactive Web Application
+│   ├── app.py                  # Gradio 3-Tab Interface (Segmentation, Landmarks, Matching)
+│   └── requirements.txt
+├── notebooks/                  # Training Pipelines & Colab Notebooks
+│   ├── train_pipeline.py       # Standalone training script
+│   └── train_colab_v2.ipynb    # Google Colab Ready Notebook
+├── results/                    # รายงานผลการทดลองและกราฟสถิติ (Reports, Curves, Plots)
+├── tests/                      # Unit Tests ครอบคลุมทุกโมดูล (20 passing tests)
+├── ROADMAP.md                  # แผนการดำเนินงานและผลลัพธ์เชิงตัวเลข
 └── README.md
 ```
 
 ---
 
-## 3. โครงสร้างชุดข้อมูล (Dataset Directory Structure)
+## 3. ผลการทดลองเชิงปริมาณ (Capstone I Benchmark Results)
 
-สร้างโฟลเดอร์ `data/` ไว้ที่ root directory ตามรูปแบบดังนี้:
+### 3.1 การแบ่งส่วนหลอดเลือด (Retinal Vessel Segmentation)
+- **Validation Dice Score**: **0.7324** (Threshold = 0.60 + Test-Time Augmentation)
+- **Specificity**: **98.66%** (พื้นหลังสะอาด ปราศจาก False Positive Noise)
+- **DRIVE Test Set**: Accuracy = **96.14%**, AUC = **0.9652**, Dice = **0.7848**
 
-```text
-data/
-├── DRIVE/
-│   ├── training/
-│   │   ├── images/          # เช่น 21_training.tif
-│   │   └── 1st_manual/      # เช่น 21_manual1.gif
-│   └── test/
-│       ├── images/          # เช่น 01_test.tif
-│       └── 1st_manual/      # เช่น 01_manual1.gif
-├── STARE/
-│   ├── images/              # เช่น im0001.ppm
-│   └── labels-vk/           # หรือ 1st_manual/ เช่น im0001.vk.ppm
-└── HRF/
-    ├── images/              # เช่น 01_dr.jpg, 01_g.jpg, 01_h.jpg
-    └── manual1/             # เช่น 01_dr.tif, 01_g.tif, 01_h.tif
-```
+### 3.2 การระบุตำแหน่งจุดอ้างอิงทางกายวิภาค (IDRiD Testing Set - 103 ภาพ)
+- **Optic Disc Localization**: Mean Error = **68.18 px** (1.59% Image Width), **Success Rate = 99.03%**
+- **Fovea Localization**: Mean Error = **108.11 px** (2.52% Image Width), **Success Rate = 94.17%**
+
+### 3.3 การยืนยันตัวบุคคลด้วยชีวมิติ (DRIVE Biometric Matching)
+- **Equal Error Rate (EER)**: **4.34%** (ความผิดพลาดต่ำมาก)
+- **Verification Accuracy @ EER**: **96.19%**
+- **Optimal Operating Threshold**: **0.200**
+- **คะแนนความเหมือน Genuine**: เฉลี่ย **0.3411** vs **Impostor**: เฉลี่ย **0.1225**
 
 ---
 
-## 4. การติดตั้งและเตรียมสภาพแวดล้อม (Installation & Setup)
+## 4. วิธีการติดตั้งและเริ่มต้นใช้งาน (Getting Started)
 
-### 4.1 แนะนำการใช้ Virtual Environment
-
+### 4.1 การเตรียม Environment
 ```bash
 # Clone repository
 git clone https://github.com/swnst/retinal-vascular.git
 cd retinal-vascular
 
-# สร้างและเปิดใช้งาน Virtual Environment
+# สร้างและเปิดใช้งาน venv
 python -m venv .venv
+.venv\Scripts\activate
 
-# บน Windows PowerShell
-.venv\Scripts\Activate.ps1
-
-# บน Linux / macOS
-source .venv/bin/activate
-```
-
-### 4.2 ติดตั้ง Dependencies
-
-```bash
-# ติดตั้ง Library สำหรับ Classical Pipeline และ Evaluation
+# ติดตั้ง Dependencies
 pip install -r requirements.txt
-
-# สำหรับงาน Deep Learning (PyTorch + Albumentations + SMP)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-pip install albumentations segmentation-models-pytorch
+pip install gradio
 ```
 
----
-
-## 5. วิธีการรันและตรวจสอบระบบ (How to Run)
-
-### 5.1 ตรวจสอบเบื้องต้น (Sanity Check - Week 1)
-ตรวจสอบการอ่านไฟล์ภาพจาก dataset DRIVE และแสดงผลแยก Green channel:
+### 4.2 การรันชุดทดสอบ (Automated Unit Tests)
 ```bash
-python notebooks/00_sanity_check.py
+pytest tests/ -v
 ```
-ผลลัพธ์จะถูกบันทึกเป็นรูปภาพ `notebooks/sanity_check_output.png`
 
-### 5.2 ตรวจสอบ Data Pipeline & Augmentation (Week 2)
-ตรวจสอบการทำงานของ PyTorch Dataset, Data Split (Train/Val/Test) และ Albumentations:
+### 4.3 การเปิดใช้งาน Interactive Web Demo
+เปิด Web App สำหรับทดลองใช้งานและนำเสนอผลงาน:
 ```bash
-python notebooks/01_data_check.py
+python demo/app.py
 ```
-ผลลัพธ์ตัวอย่าง 4 คู่ (Image + Mask) หลังผ่าน Augmentation จะถูกบันทึกเป็น `notebooks/data_check_output.png`
-
----
-
-## 6. ข้อตกลง Interface ระหว่างสองสายงาน (Interface Agreement)
-
-ฟังก์ชันเชื่อมโยงระหว่างโมเดล Deep Learning (สกัด Vessel) กับ Classical Pipeline (หาจุดสำคัญ):
-
-```python
-def find_optic_disk(vessel_map: np.ndarray, green_image: np.ndarray) -> tuple[int, int]:
-    # vessel_map: binary 2D array ขนาดเท่าภาพต้นฉบับ (0/1, 1=vessel)
-    # green_image: green channel ขนาดเดียวกัน
-    # return: (x, y) พิกัดจุดศูนย์กลาง optic disk
-
-def find_fovea(vessel_map: np.ndarray, optic_disk_xy: tuple[int, int]) -> tuple[int, int]:
-    # vessel_map: binary 2D array ขนาดเท่าภาพต้นฉบับ (0/1, 1=vessel)
-    # optic_disk_xy: (x, y) พิกัดจุดศูนย์กลาง optic disk
-    # return: (x, y) พิกัดจุดศูนย์กลาง fovea
-```
+เปิดบราวเซอร์ไปที่ `http://127.0.0.1:7860` เพื่อเข้าสู่ระบบเดโม 3 แท็บ (Segmentation, Landmarks, Biometrics)

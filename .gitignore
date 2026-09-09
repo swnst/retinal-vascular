@@ -36,3 +36,17 @@ Thumbs.db
 # Logs
 *.log
 wandb/
+
+# AI Agent & Assistant Files
+GEMINI.md
+GEMINI.yaml
+.gemini/
+.geminirules
+CLAUDE.md
+.claude/
+AGENTS.md
+.agents/
+.cursorrules
+.cursor/
+.windsurfrules
+.antigravity/

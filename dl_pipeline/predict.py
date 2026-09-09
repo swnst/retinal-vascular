@@ -59,7 +59,7 @@ def predict_vessel_mask(
     model: nn.Module,
     image: np.ndarray | Image.Image | str | Path,
     device: str | torch.device = "cpu",
-    threshold: float = 0.5,
+    threshold: float = 0.60,
     return_original_size: bool = True,
     use_tta: bool = False,
     img_size: int = 512,

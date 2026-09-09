@@ -32,6 +32,7 @@ def run_training(
     plot_path: str = "results/training_curves.png",
     patience: int = 8,
     img_size: int = 512,
+    encoder_name: str = "resnet34",
     device: str | None = None,
 ) -> None:
     if device is None:
@@ -78,9 +79,9 @@ def run_training(
     )
 
     # 2. Model Architecture
-    print("Building U-Net (ResNet-34 Encoder)...")
+    print(f"Building U-Net ({encoder_name} Encoder)...")
     model = get_model(
-        encoder_name="resnet34",
+        encoder_name=encoder_name,
         encoder_weights="imagenet",
         in_channels=3,
         classes=1,

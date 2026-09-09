@@ -210,6 +210,27 @@ def build_app() -> gr.Blocks:
                     outputs=[out_graph_a, out_graph_b, match_result],
                 )
 
+                # Pre-prepared clickable examples for immediate testing
+                examples_dir = PROJECT_ROOT / "demo" / "examples"
+                if (examples_dir / "subject1_original.png").exists():
+                    gr.Markdown("#### ตัวอย่างภาพสำเร็จรูปสำหรับทดสอบคลิกเดียว:")
+                    gr.Examples(
+                        examples=[
+                            [
+                                str(examples_dir / "subject1_original.png"),
+                                str(examples_dir / "subject1_tilted_genuine.png"),
+                            ],
+                            [
+                                str(examples_dir / "subject1_original.png"),
+                                str(examples_dir / "subject2_impostor.png"),
+                            ],
+                        ],
+                        inputs=[in_a, in_b],
+                        outputs=[out_graph_a, out_graph_b, match_result],
+                        fn=process_biometric_matching,
+                        label="คลิกเลือกชุดทดสอบ: คู่ที่ 1 (บุคคลเดียวกัน - ภาพเอียง 5 องศา) หรือ คู่ที่ 2 (คนละคน - ผู้แอบอ้าง)",
+                    )
+
         gr.Markdown("--- \n**Retinal Vascular Biometrics Capstone I Research Engine**")
 
     return app

@@ -1,18 +1,17 @@
 """
 Vessel Segmentation Evaluation Pipeline
 
-สคริปต์ประเมินผลประสิทธิภาพโมเดล Vessel Segmentation บน Dataset:
+Evaluates retinal vessel segmentation model across datasets:
 - DRIVE
 - HRF
 - STARE
 
-คำนวณ Metrics ครบถ้วน:
+Computes standard clinical segmentation metrics:
 - Accuracy (ACC)
 - Sensitivity / Recall (SE)
 - Specificity (SP)
 - F1-Score / Dice Coefficient
 - Area Under ROC Curve (AUC-ROC)
-พร้อมสรุปผลเป็นตาราง Markdown บันทึกลง results/vessel_evaluation_report.md
 """
 
 import sys
@@ -39,12 +38,12 @@ def evaluate_samples(
     samples: Sequence[tuple[str, str]],
     dataset_name: str,
     device: str | torch.device = "cpu",
-    threshold: float = 0.5,
+    threshold: float = 0.60,
     use_tta: bool = False,
     max_eval_samples: int | None = None,
 ) -> dict[str, float]:
     """
-    รันประเมินผลตัวอย่างภาพใน Dataset และหาค่าเฉลี่ย Metrics
+    Evaluate sample images in a dataset and return averaged metrics.
     """
     eval_list = list(samples[:max_eval_samples]) if max_eval_samples else list(samples)
     if not eval_list:
@@ -59,25 +58,9 @@ def evaluate_samples(
             "auc_roc": 0.0,
         }
 
-    accs = []
-    sens = []
-    specs = []
-    f1s = []
-    dices = []
-    aucs = []
-
-    import gzip
-    import io
+    accs, sens, specs, f1s, dices, aucs = [], [], [], [], [], []
 
     for img_path, mask_path in eval_list:
-        if str(mask_path).endswith(".gz"):
-            with gzip.open(mask_path, "rb") as gz_file:
-                with Image.open(io.BytesIO(gz_file.read())) as m_pil:
-                    gt_mask = (np.array(m_pil.convert("L")) > 0).astype(np.uint8)
-        else:
-            with Image.open(mask_path) as m_pil:
-                gt_mask = (np.array(m_pil.convert("L")) > 0).astype(np.uint8)
-
         bin_mask, prob_map = predict_vessel_mask(
             model=model,
             image=img_path,
@@ -87,10 +70,12 @@ def evaluate_samples(
             use_tta=use_tta,
         )
 
+        with Image.open(mask_path) as m_pil:
+            gt_mask = np.array(m_pil.convert("L"))
+
         if gt_mask.shape != bin_mask.shape:
             gt_resized = Image.fromarray(gt_mask).resize((bin_mask.shape[1], bin_mask.shape[0]), Image.NEAREST)
             gt_mask = np.array(gt_resized)
-
 
         metrics = pixel_metrics(bin_mask, gt_mask, threshold=threshold)
         auc = compute_auc_roc(prob_map, gt_mask)
@@ -116,7 +101,7 @@ def evaluate_samples(
 
 def generate_markdown_report(results: list[dict[str, float]], output_path: str | Path) -> str:
     """
-    สร้างรายงานสรุปผลการประเมินในรูปแบบตาราง Markdown และบันทึกลงไฟล์
+    Generate Markdown summary table report and save to disk.
     """
     lines = [
         "# Retinal Vessel Segmentation Evaluation Report",
@@ -146,12 +131,12 @@ def run_full_evaluation(
     data_dir: str | Path = "data",
     output_report_path: str | Path = "results/vessel_evaluation_report.md",
     device: str | torch.device = "cpu",
-    threshold: float = 0.5,
+    threshold: float = 0.60,
     use_tta: bool = False,
     max_eval_samples: int | None = None,
 ) -> list[dict[str, float]]:
     """
-    รันประเมินผลครบทั้ง 3 Dataset (DRIVE, HRF, STARE)
+    Run evaluation across DRIVE, HRF, and STARE datasets.
     """
     if isinstance(model_or_checkpoint, (str, Path)):
         model = load_model_checkpoint(model_or_checkpoint, device=device)
@@ -190,11 +175,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Evaluate Vessel Segmentation Model")
-    parser.add_argument("--checkpoint", type=str, default="models/best_unet_model.pth")
+    parser.add_argument("--checkpoint", type=str, default="models/best_unet_model_v2.pth")
     parser.add_argument("--data-dir", type=str, default="data")
     parser.add_argument("--output", type=str, default="results/vessel_evaluation_report.md")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--tta", action="store_true", help="Enable Test-Time Augmentation")
+    parser.add_argument("--threshold", type=float, default=0.60)
     args = parser.parse_args()
 
     run_full_evaluation(
@@ -203,4 +189,5 @@ if __name__ == "__main__":
         output_report_path=args.output,
         device=args.device,
         use_tta=args.tta,
+        threshold=args.threshold,
     )

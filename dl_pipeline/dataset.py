@@ -1,14 +1,11 @@
 """
 PyTorch Retinal Vessel Dataset Module
 
-คลาส RetinalVesselDataset สำหรับโหลดข้อมูลภาพจอประสาทตาและ Ground Truth Mask
-พร้อมรองรับ:
-- การโหลดจากหลายแหล่ง (DRIVE, STARE, HRF)
-- การแบ่ง Train/Val/Test Split ระดับภาพ (Image-level split)
-- Data Augmentation ด้วย albumentations (HorizontalFlip, VerticalFlip, RandomRotate90, RandomBrightnessContrast)
-- การ Resize สู่ 512x512
-- การ Normalize pixel เป็นช่วง [0.0, 1.0]
-- คืนค่าเป็น PyTorch Tensor (Image: 3x512x512, Mask: 1x512x512)
+RetinalVesselDataset class for loading fundus images and ground truth masks:
+- Multi-dataset support (DRIVE, STARE, HRF)
+- Image-level train/val/test splitting
+- Data augmentation via Albumentations
+- Normalized tensor outputs (Image: 3x512x512, Mask: 1x512x512)
 """
 
 import gzip
@@ -25,10 +22,9 @@ import albumentations as A
 from dl_pipeline.data_utils import discover_dataset_samples, DatasetName
 
 
-
 def get_default_train_transform(img_size: int = 512) -> A.Compose:
     """
-    ส่งคืน Albumentations compose transform มาตรฐานสำหรับช่วง Training:
+    Default Albumentations compose transform for training:
     - Resize 512x512
     - HorizontalFlip, VerticalFlip
     - RandomRotate90
@@ -47,7 +43,7 @@ def get_default_train_transform(img_size: int = 512) -> A.Compose:
 
 def get_default_val_test_transform(img_size: int = 512) -> A.Compose:
     """
-    ส่งคืน Albumentations compose transform สำหรับช่วง Validation / Testing (เฉพาะ Resize)
+    Default Albumentations compose transform for validation/testing (Resize only).
     """
     return A.Compose(
         [
@@ -63,7 +59,7 @@ def split_samples(
     seed: int = 42,
 ) -> list[tuple[str, str]]:
     """
-    แบ่งรายชื่อคู่ (image, mask) เป็น train / val / test ที่ระดับภาพ (Image-level split)
+    Split list of (image, mask) pairs into train / val / test at the image level.
     """
     if split == "all":
         return list(samples)
@@ -86,7 +82,6 @@ def split_samples(
     elif n_total == 2:
         n_train, n_val = 1, 1
     else:
-        # If test ratio is 0 (train/val only)
         if r_test == 0.0:
             n_val = max(1, int(round(n_total * r_val)))
             n_train = n_total - n_val
@@ -115,7 +110,7 @@ def split_samples(
 
 class RetinalVesselDataset(Dataset):
     """
-    PyTorch Dataset สำหรับงาน Retinal Blood Vessel Segmentation
+    PyTorch Dataset for Retinal Blood Vessel Segmentation.
     """
 
     def __init__(
@@ -168,13 +163,11 @@ class RetinalVesselDataset(Dataset):
             with Image.open(mask_path) as mask_pil:
                 mask = np.array(mask_pil.convert("L"))
 
-        # หากขนาดภาพและ mask ไม่ตรงกัน ให้ปรับ mask ให้เท่ากับ image
         if image.shape[:2] != mask.shape[:2]:
             mask_resized = Image.fromarray(mask).resize((image.shape[1], image.shape[0]), Image.NEAREST)
             mask = np.array(mask_resized)
 
         mask = (mask > 0).astype(np.uint8)
-
 
         if self.transform is not None:
             augmented = self.transform(image=image, mask=mask)

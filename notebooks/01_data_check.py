@@ -1,12 +1,12 @@
 """
 Data Pipeline Check Script: RetinalVesselDataset & Augmentations
 
-สคริปต์ตรวจสอบการทำงานของ Dataset Class ใน dl_pipeline/dataset.py:
-- โหลด Dataset จาก data/DRIVE/ (หรือโฟลเดอร์ dataset รวม)
-- ทดสอบการทำงานของ Data Augmentation (HorizontalFlip, VerticalFlip, RandomRotate90, RandomBrightnessContrast)
-- ดึงตัวอย่าง 4 คู่ (Image + Mask) หลัง Augmentation
-- แสดงผลเรียง 4 คู่ (Image คู่กับ Mask) ด้วย matplotlib
-- บันทึกผลลัพธ์เป็นไฟล์รูปภาพ (notebooks/data_check_output.png) โดยไม่ต้องใช้ plt.show()
+Script for testing the Dataset class implementation in dl_pipeline/dataset.py:
+- Load Dataset from data/DRIVE/ (or unified dataset directories)
+- Verify data augmentations (HorizontalFlip, VerticalFlip, RandomRotate90, RandomBrightnessContrast)
+- Extract 4 augmented sample pairs (Image + Mask)
+- Plot 4 pairs side-by-side using matplotlib
+- Save output visualization to notebooks/data_check_output.png without requiring interactive GUI display
 """
 
 import os

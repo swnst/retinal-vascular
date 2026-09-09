@@ -1,9 +1,9 @@
 """
 Evaluation Metrics Module for Vessel Segmentation and Landmark Localization
 
-โมดูลคำนวณตัวชี้วัดประสิทธิภาพ:
-1. pixel_metrics: Accuracy, Sensitivity (Recall / TPR), Specificity (TNR) สำหรับ vessel segmentation
-2. localization_distance: Euclidean distance สำหรับการประเมินตำแหน่ง Optic Disk และ Fovea เทียบ Ground Truth
+Performance evaluation metrics module:
+1. pixel_metrics: Accuracy, Sensitivity (Recall / TPR), Specificity (TNR) for vessel segmentation.
+2. localization_distance: Euclidean distance for evaluating Optic Disc and Fovea landmarks against Ground Truth.
 """
 
 from typing import Any
@@ -12,7 +12,7 @@ import numpy as np
 
 def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> dict[str, float]:
     """
-    คำนวณค่า Pixel-level Classification Metrics สำหรับ Binary Vessel Segmentation:
+    Calculate pixel-level classification metrics for binary vessel segmentation:
     - Accuracy = (TP + TN) / (TP + TN + FP + FN)
     - Sensitivity (Recall, True Positive Rate) = TP / (TP + FN)
     - Specificity (True Negative Rate) = TN / (TN + FP)
@@ -20,17 +20,17 @@ def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> d
     Parameters
     ----------
     pred : np.ndarray
-        Array ผลลัพธ์จากการทำนาย ขนาดเดียวกับ gt
-        อาจเป็น probability map (0.0 ถึง 1.0) หรือ binary mask (0/1 หรือ bool)
+        Array predicted by model with identical shape to gt.
+        Can be a probability map (0.0 to 1.0) or binary mask (0/1 or bool).
     gt : np.ndarray
-        Ground truth binary mask (ค่า 0 หรือ 1, หรือ bool) ขนาดเดียวกันกับ pred
+        Ground truth binary mask (values 0 or 1, or bool) with identical shape to pred.
     threshold : float, optional
-        เกณฑ์ threshold สำหรับ binarize ค่า pred หากยังไม่เป็น binary (default: 0.5)
+        Threshold used to binarize pred if not already binary (default: 0.5).
 
     Returns
     -------
     dict[str, float]
-        พจนานุกรมผลลัพธ์:
+        Dictionary containing metric scores:
         {
             "accuracy": float,
             "sensitivity": float,
@@ -87,28 +87,28 @@ def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> d
 
 def compute_auc_roc(prob_map: np.ndarray, gt: np.ndarray, max_samples: int = 200000) -> float:
     """
-    คำนวณ Area Under ROC Curve (AUC-ROC) สำหรับความน่าจะเป็นระดับพิกเซล
+    Calculate Area Under ROC Curve (AUC-ROC) for pixel-level probabilities.
 
     Parameters
     ----------
     prob_map : np.ndarray
-        Continuous probability map หรือ prediction scores (ช่วง 0.0 ถึง 1.0)
+        Continuous probability map or prediction scores (range 0.0 to 1.0).
     gt : np.ndarray
-        Ground truth binary mask (0 หรือ 1)
+        Ground truth binary mask (0 or 1).
     max_samples : int, optional
-        การสุ่มตัวอย่างกรณีภาพขนาดใหญ่มากเพื่อความรวดเร็วและป้องกัน memory overflow
+        Subsample size for large images to optimize speed and avoid memory overflow.
 
     Returns
     -------
     float
-        AUC-ROC score (0.0 ถึง 1.0)
+        AUC-ROC score (0.0 to 1.0).
     """
     from sklearn.metrics import roc_auc_score
 
     y_score = np.asarray(prob_map, dtype=np.float32).ravel()
     y_true = (np.asarray(gt).ravel() > 0).astype(np.int32)
 
-    # ตรวจสอบว่าใน ground truth มีทั้ง class 0 และ 1
+    # Verify ground truth contains both classes
     if len(np.unique(y_true)) < 2:
         return 1.0
 
@@ -130,21 +130,21 @@ def localization_distance(
     gt_xy: tuple[float, float] | tuple[int, int] | list[float] | np.ndarray,
 ) -> float:
     """
-    คำนวณระยะห่าง Euclidean Distance ระหว่างพิกัดที่ทำนาย (pred_xy) กับพิกัดจริง (gt_xy)
+    Calculate Euclidean Distance between predicted coordinates (pred_xy) and ground truth (gt_xy).
 
     distance = sqrt((x_pred - x_gt)^2 + (y_pred - y_gt)^2)
 
     Parameters
     ----------
     pred_xy : tuple, list, or np.ndarray
-        พิกัด (x, y) ที่โมเดลทำนายได้
+        Predicted coordinates (x, y).
     gt_xy : tuple, list, or np.ndarray
-        พิกัด (x, y) ของ Ground Truth
+        Ground truth coordinates (x, y).
 
     Returns
     -------
     float
-        ระยะห่าง Euclidean distance มีหน่วยเป็น pixel
+        Euclidean distance in pixels.
     """
     p = np.asarray(pred_xy, dtype=np.float64)
     g = np.asarray(gt_xy, dtype=np.float64)

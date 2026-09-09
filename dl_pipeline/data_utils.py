@@ -1,11 +1,8 @@
 """
 Dataset Utilities and File Discovery Module
 
-ฟังก์ชันช่วยค้นหาและจับคู่ไฟล์ภาพถ่ายจอประสาทตา (Fundus Images)
-และไฟล์ Ground Truth Mask สำหรับ 3 ชุดข้อมูล:
-1. DRIVE (Digital Retinal Images for Vessel Extraction)
-2. STARE (STructured Analysis of the REtina)
-3. HRF (High-Resolution Fundus Image Database)
+Helper functions to discover and pair retinal fundus images and ground-truth vessel masks
+for DRIVE, STARE, and HRF datasets.
 """
 
 import os
@@ -19,17 +16,17 @@ DatasetName = Literal["DRIVE", "STARE", "HRF"]
 
 def list_drive_samples(root_dir: str | Path) -> list[tuple[str, str]]:
     """
-    จับคู่ไฟล์ภาพและ mask ของชุดข้อมูล DRIVE
-    
-    Structure รองรับ:
-    - {root}/training/images/*_training.tif กับ {root}/training/1st_manual/*_manual1.gif
-    - {root}/test/images/*_test.tif กับ {root}/test/1st_manual/*_manual1.gif
-    - หรือโครงสร้าง flat ภายใน images/ และ 1st_manual/ หรือ manual/
+    Pair image and mask files for the DRIVE dataset.
+
+    Supported structures:
+    - {root}/training/images/*_training.tif with {root}/training/1st_manual/*_manual1.gif
+    - {root}/test/images/*_test.tif with {root}/test/1st_manual/*_manual1.gif
+    - or flat structures under images/ and 1st_manual/
 
     Returns
     -------
     list[tuple[str, str]]
-        รายการของ tuple (image_path, mask_path)
+        List of (image_path, mask_path) tuples.
     """
     root = Path(root_dir)
     samples: list[tuple[str, str]] = []
@@ -80,7 +77,7 @@ def list_drive_samples(root_dir: str | Path) -> list[tuple[str, str]]:
                             mask_candidates.append(m_file)
 
         if not mask_candidates:
-            # Fallback to general search but strictly for vessel manual annotations, avoiding circular FOV mask
+            # Fallback search strictly for manual vessel annotations, excluding circular FOV masks
             for m_file in root.rglob("*"):
                 if m_file.is_file():
                     parts = [part.lower() for part in m_file.parts]
@@ -99,7 +96,7 @@ def list_drive_samples(root_dir: str | Path) -> list[tuple[str, str]]:
 
 def list_stare_samples(root_dir: str | Path) -> list[tuple[str, str]]:
     """
-    จับคู่ไฟล์ภาพและ mask ของชุดข้อมูล STARE
+    Pair image and mask files for the STARE dataset.
     """
     root = Path(root_dir)
     samples: list[tuple[str, str]] = []
@@ -142,7 +139,7 @@ def list_stare_samples(root_dir: str | Path) -> list[tuple[str, str]]:
 
 def list_hrf_samples(root_dir: str | Path) -> list[tuple[str, str]]:
     """
-    จับคู่ไฟล์ภาพและ mask ของชุดข้อมูล HRF
+    Pair image and mask files for the HRF dataset.
     """
     root = Path(root_dir)
     samples: list[tuple[str, str]] = []
@@ -178,7 +175,7 @@ def discover_dataset_samples(
     root_dir: str | Path, dataset_name: DatasetName | str | None = None
 ) -> list[tuple[str, str]]:
     """
-    ค้นหาและจับคู่ตัวอย่างภาพและ mask ตามประเภทชุดข้อมูล หรือระบุอัตโนมัติจากชื่อโฟลเดอร์
+    Discover and pair images and masks across datasets.
     """
     root = Path(root_dir)
     if not root.exists():
@@ -193,7 +190,6 @@ def discover_dataset_samples(
     elif "HRF" in name:
         return list_hrf_samples(root)
     else:
-        # หาก root_dir เป็นโฟลเดอร์แม่ (เช่น 'data/') ให้รวมเฉพาะ datasets หลัก (DRIVE, HRF, STARE)
         combined: list[tuple[str, str]] = []
         for sub_name, func in [("DRIVE", list_drive_samples), ("HRF", list_hrf_samples), ("STARE", list_stare_samples)]:
             sub_p = root / sub_name
@@ -202,7 +198,6 @@ def discover_dataset_samples(
         if combined:
             return combined
 
-        # Fallback หาก root_dir มีโครงสร้างภายใน
         drive_res = list_drive_samples(root)
         if drive_res:
             return drive_res
@@ -215,10 +210,9 @@ def discover_dataset_samples(
         return []
 
 
-
 def create_synthetic_drive_sample(output_dir: str | Path) -> tuple[str, str]:
     """
-    สร้าง synthetic sample สำหรับทดสอบเมื่อยังไม่ได้ดาวน์โหลด dataset จริง
+    Create a synthetic DRIVE sample for testing environments without raw datasets.
     """
     root = Path(output_dir)
     img_dir = root / "training" / "images"

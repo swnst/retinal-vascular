@@ -1,14 +1,14 @@
 """
 Google Colab & Local Training Pipeline Script (Week 3)
 
-สคริปต์สำหรับการรันเทรนโมเดล U-Net ResNet-34 บน Google Colab (T4 GPU) หรือ Local GPU/CPU:
-1. รองรับการเทรนบน GPU (CUDA) อัตโนมัติ
-2. โหลด Dataset แบบ 80/20 train/val split
-3. CombinedLoss (BCEWithLogitsLoss + DiceLoss) แก้ปัญหา Class Imbalance
-4. Adam optimizer (lr=1e-4) ร่วมกับ CosineAnnealingLR / ReduceLROnPlateau
-5. Early Stopping ป้องกัน Overfitting
-6. บันทึก Best Model ไว้ที่ models/best_unet_model.pth
-7. พล็อตและบันทึกผลการเทรนที่ results/training_curves.png
+Script for training U-Net ResNet-34 model on Google Colab (T4 GPU) or local GPU/CPU:
+1. Automatic GPU (CUDA) acceleration support
+2. Unified dataset loading with 80/20 train/val split
+3. CombinedLoss (BCEWithLogitsLoss + DiceLoss) addressing class imbalance
+4. Adam optimizer (lr=1e-4) paired with CosineAnnealingLR / ReduceLROnPlateau
+5. Early stopping to prevent overfitting
+6. Best model checkpoint saved to models/best_unet_model.pth
+7. Plots and saves learning curves to results/training_curves.png
 """
 
 import argparse

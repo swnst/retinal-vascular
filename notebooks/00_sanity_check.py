@@ -1,12 +1,12 @@
 """
 Sanity Check Script: Load DRIVE Image and Visualize Channels
 
-สคริปต์ตรวจสอบการอ่านไฟล์ภาพจาก dataset DRIVE:
-- ค้นหาภาพตัวอย่าง 1 ภาพจาก data/DRIVE/ (ทั้ง training และ test)
-- โหลด Original RGB Image, แยก Green Channel, และ Ground Truth Mask
-- แสดงผลเปรียบเทียบ 3 ช่องด้วย matplotlib (Original, Green Channel, Ground Truth Mask)
-- บันทึกผลลัพธ์ลงไฟล์รูปภาพ (notebooks/sanity_check_output.png) โดยไม่ต้องใช้ plt.show()
-- รองรับ Fallback: หากยังไม่มีไฟล์จริงใน data/DRIVE จะสร้าง synthetic retina fundus image ให้รันผ่านและตรวจสอบ pipeline ได้ทันที
+Script for verifying image loading from the DRIVE dataset:
+- Locate sample image from data/DRIVE/ (training or test)
+- Load Original RGB Image, extract Green Channel, and load Ground Truth Mask
+- Visualize 3-channel comparison with matplotlib (Original, Green Channel, Ground Truth Mask)
+- Save visualization to file (notebooks/sanity_check_output.png) without requiring interactive GUI display
+- Synthetic fallback: generates synthetic retinal fundus images if data/DRIVE is empty
 """
 
 import os

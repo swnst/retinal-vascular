@@ -1,13 +1,11 @@
 """
 Inference and Prediction Pipeline Module
 
-สคริปต์และฟังก์ชันสำหรับการทำ Inference ด้วยโมเดลที่ผ่านการเทรนแล้ว:
-- โหลด checkpoint น้ำหนักโมเดล (.pth / .pt)
-- รับภาพ fundus ขนาดจริง -> Preprocess & Resize สู่ 512x512 -> Forward pass
-- Binarize ผลลัพธ์ด้วยเกณฑ์ threshold
-- Resize vessel map ที่ทำนายได้กลับเป็นขนาดต้นฉบับเพื่อส่งต่อให้ Classical Pipeline
-
-โมดูลนี้จะถูกพัฒนาใน Week 4 เป็นต้นไป
+Helper functions for retinal vessel segmentation inference:
+- Load model checkpoint weights (.pth / .pt)
+- Preprocess and resize input image to model dimensions (512x512)
+- Test-Time Augmentation (TTA) with horizontal flip averaging
+- Restore predicted vessel probability maps and binary masks to original resolution
 """
 
 from pathlib import Path
@@ -28,7 +26,7 @@ def load_model_checkpoint(
     in_channels: int = 3,
 ) -> nn.Module:
     """
-    โหลดโมเดลพร้อมน้ำหนัก checkpoint (.pth)
+    Load model with saved checkpoint weights (.pth).
     """
     device_obj = torch.device(device)
     model = get_model(
@@ -65,37 +63,36 @@ def predict_vessel_mask(
     img_size: int = 512,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    ทำนาย Vessel Segmentation Mask จากภาพจอประสาทตา
+    Predict vessel segmentation mask from a fundus image.
 
     Parameters
     ----------
     model : nn.Module
-        โมเดล U-Net ที่พร้อมทำนาย
+        Trained segmentation model.
     image : np.ndarray | Image.Image | str | Path
-        ภาพอินพุต (RGB หรือ Grayscale, numpy array หรือ PIL image หรือ path)
+        Input image (RGB or grayscale, numpy array, PIL Image, or file path).
     device : str | torch.device, optional
-        อุปกรณ์ที่ใช้คำนวณ (default: 'cpu')
+        Computation device (default: 'cpu').
     threshold : float, optional
-        เกณฑ์ตัดสิน Binary mask (default: 0.5)
+        Probability binarization threshold (default: 0.60).
     return_original_size : bool, optional
-        ถ้า True จะขยายผลลัพธ์กลับสู่ขนาดเดิมของภาพอินพุต (default: True)
+        Whether to restore predicted maps to the original image resolution (default: True).
     use_tta : bool, optional
-        เปิดใช้งาน Test-Time Augmentation (Horizontal Flip) (default: False)
+        Enable Test-Time Augmentation via horizontal flip (default: False).
     img_size : int, optional
-        ขนาดความกว้างยาวที่จะป้อนเข้าโมเดล (default: 512)
+        Model input resolution (default: 512).
 
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
         (binary_mask, prob_map)
-        - binary_mask: array ค่า 0 หรือ 1 (uint8)
-        - prob_map: probability map ช่วง [0.0, 1.0] (float32)
+        - binary_mask: array of 0 or 1 (uint8).
+        - prob_map: probability values in [0.0, 1.0] (float32).
     """
     device_obj = torch.device(device)
     model.to(device_obj)
     model.eval()
 
-    # จัดการประเภทของภาพอินพุต
     if isinstance(image, (str, Path)):
         pil_img = Image.open(image).convert("RGB")
         img_np = np.array(pil_img)
@@ -113,7 +110,6 @@ def predict_vessel_mask(
 
     orig_h, orig_w = img_np.shape[:2]
 
-    # Resize สู่ 512x512
     resized_img = cv2.resize(img_np, (img_size, img_size), interpolation=cv2.INTER_LINEAR)
     tensor_in = torch.from_numpy(resized_img.astype(np.float32) / 255.0).permute(2, 0, 1).unsqueeze(0).to(device_obj)
 
@@ -122,7 +118,6 @@ def predict_vessel_mask(
         prob = torch.sigmoid(logits)
 
         if use_tta:
-            # Test-Time Augmentation: Horizontal Flip
             tensor_flipped = torch.flip(tensor_in, dims=[3])
             logits_flipped = model(tensor_flipped)
             prob_flipped = torch.sigmoid(logits_flipped)
@@ -139,4 +134,3 @@ def predict_vessel_mask(
     binary_mask = (prob_map >= threshold).astype(np.uint8)
 
     return binary_mask, prob_map
-

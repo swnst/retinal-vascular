@@ -1,17 +1,17 @@
 """
 Visual Evaluation and Qualitative Comparison Script (Week 4)
 
-สร้างรูปภาพเปรียบเทียบเชิงคุณภาพ (Qualitative Visual Comparison):
-4 คอลัมน์:
+Generate qualitative visual comparison figures:
+4 columns:
 1. Original Retinal Image
 2. Ground Truth Vessel Mask
 3. Predicted Vessel Mask (U-Net)
 4. Error Overlay:
-   - สีเขียว (Green) = True Positive (TP - ทายถูกว่ามีเส้นเลือด)
-   - สีแดง (Red) = False Positive (FP - ทายผิดว่ามีเส้นเลือดทั้งที่ไม่มี)
-   - สีน้ำเงิน (Blue) = False Negative (FN - ตกหล่น เส้นเลือดจริงแต่โมเดลมองไม่เห็น)
+   - Green = True Positive (TP - correctly segmented vessel)
+   - Red = False Positive (FP - incorrectly detected background as vessel)
+   - Blue = False Negative (FN - missed vessel present in ground truth)
 
-บันทึกผลลัพธ์เป็น results/vessel_prediction_samples.png
+Saves output to results/vessel_prediction_samples.png
 """
 
 import sys
@@ -33,7 +33,7 @@ from dl_pipeline.data_utils import discover_dataset_samples
 
 def create_error_overlay(pred_bin: np.ndarray, gt_bin: np.ndarray) -> np.ndarray:
     """
-    สร้างภาพสี RGB แสดงข้อผิดพลาดการแบ่งส่วนเส้นเลือด:
+    Generate RGB error overlay for vessel segmentation:
     - Green = TP (Pred=1, GT=1)
     - Red = FP (Pred=1, GT=0)
     - Blue = FN (Pred=0, GT=1)
@@ -49,9 +49,9 @@ def create_error_overlay(pred_bin: np.ndarray, gt_bin: np.ndarray) -> np.ndarray
     fp = np.logical_and(p, ~g)
     fn = np.logical_and(~p, g)
 
-    overlay[tp] = [0, 230, 0]    # เขียว
-    overlay[fp] = [230, 0, 0]    # แดง
-    overlay[fn] = [0, 100, 255]  # ฟ้า/น้ำเงิน
+    overlay[tp] = [0, 230, 0]    # Green
+    overlay[fp] = [230, 0, 0]    # Red
+    overlay[fn] = [0, 100, 255]  # Blue
 
     return overlay
 
@@ -65,7 +65,7 @@ def generate_visual_comparison_samples(
     threshold: float = 0.5,
 ) -> None:
     """
-    สุ่มดึงตัวอย่างจากแต่ละ Dataset มาสร้าง visual comparison figure
+    Sample images from each dataset and generate a visual comparison figure.
     """
     if isinstance(model_or_checkpoint, (str, Path)):
         model = load_model_checkpoint(model_or_checkpoint, device=device)
@@ -129,7 +129,7 @@ def generate_visual_comparison_samples(
         error_map = create_error_overlay(pred_mask, gt_mask)
 
 
-        # Plot 4 คอลัมน์
+        # Plot 4 columns
         axes[row_idx, 0].imshow(orig_img)
         axes[row_idx, 0].set_ylabel(f"{ds_name}\n({Path(img_path).name})", fontsize=11, fontweight="bold")
         axes[row_idx, 0].axis("on")

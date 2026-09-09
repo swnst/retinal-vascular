@@ -1,14 +1,12 @@
 """
 Training Pipeline Module
 
-สคริปต์สำหรับการเทรนโมเดล Retinal Vessel Segmentation ตาม ROADMAP.md Week 3:
+Training pipeline for Retinal Vessel Segmentation:
 - Combined Loss: Binary Cross Entropy (BCE) + Dice Loss
 - Optimizer: Adam
-- Training loop พร้อม Validation evaluation (Accuracy, Sensitivity, Specificity)
-- Checkpointing และบันทึกโมเดลที่ดีที่สุด (best model weights)
-- รองรับการเทรนบน Google Colab / Kaggle GPU
-
-โมดูลนี้จะถูกพัฒนาอย่างสมบูรณ์ใน Week 3
+- Training loop with validation evaluation
+- Checkpointing and best model serialization
+- Cross-platform support (Local / Google Colab / Kaggle)
 """
 
 import os
@@ -29,8 +27,7 @@ from dl_pipeline.data_utils import discover_dataset_samples
 
 class DiceLoss(nn.Module):
     """
-    Dice Loss สำหรับ Binary Segmentation
-
+    Dice Loss for binary segmentation:
     Loss = 1 - (2 * |X ∩ Y| + smooth) / (|X| + |Y| + smooth)
     """
 
@@ -51,8 +48,8 @@ class DiceLoss(nn.Module):
 
 class CombinedLoss(nn.Module):
     """
-    ผสมผสานระหว่าง BCEWithLogitsLoss และ DiceLoss
-    ช่วยรับมือกับปัญหา Class Imbalance ของเส้นเลือดจอประสาทตา (เส้นเลือดมีสัดส่วนเพียง ~10-15% ของพิกเซลทั้งหมด)
+    Combined BCEWithLogitsLoss and DiceLoss.
+    Mitigates severe class imbalance in retinal blood vessels (~10-12% vessel pixels).
     """
 
     def __init__(
@@ -77,7 +74,7 @@ class CombinedLoss(nn.Module):
 
 def compute_batch_dice(logits: torch.Tensor, targets: torch.Tensor, threshold: float = 0.5, smooth: float = 1e-6) -> float:
     """
-    คำนวณค่าเฉลี่ย Dice Score ของ batch จาก logits
+    Compute average batch Dice score from logits.
     """
     probs = torch.sigmoid(logits)
     preds = (probs >= threshold).float()
@@ -97,8 +94,8 @@ def train_epoch(
     device: torch.device,
 ) -> tuple[float, float]:
     """
-    ฝึกฝนโมเดลเป็นเวลา 1 Epoch
-    คืนค่า (avg_loss, avg_dice)
+    Execute one training epoch.
+    Returns (avg_loss, avg_dice).
     """
     model.train()
     running_loss = 0.0
@@ -135,8 +132,8 @@ def validate(
     device: torch.device,
 ) -> tuple[float, float]:
     """
-    ประเมินผลโมเดลบนชุด Validation
-    คืนค่า (avg_loss, avg_dice)
+    Evaluate model on validation loader.
+    Returns (avg_loss, avg_dice).
     """
     model.eval()
     running_loss = 0.0
@@ -163,8 +160,7 @@ def validate(
 
 class EarlyStopping:
     """
-    Early Stopping คอยตรวจสอบเมตริกเป้าหมาย (เช่น val_dice หรือ val_loss)
-    หากไม่ดีขึ้นต่อเนื่องตาม patience จะสั่งหยุดการเทรน
+    Early stopping monitor on target metric (e.g., validation dice or loss).
     """
 
     def __init__(self, patience: int = 7, mode: str = "max", min_delta: float = 1e-4) -> None:
@@ -198,7 +194,7 @@ class EarlyStopping:
 
 def plot_training_curves(history: dict[str, list[float]], output_path: str | Path) -> None:
     """
-    วาดและบันทึกกราฟผลการฝึกสอน (Loss & Dice Score)
+    Plot and save training and validation curves.
     """
     out_p = Path(output_path)
     out_p.parent.mkdir(parents=True, exist_ok=True)
@@ -207,7 +203,6 @@ def plot_training_curves(history: dict[str, list[float]], output_path: str | Pat
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
-    # กราฟ Loss
     axes[0].plot(epochs, history["train_loss"], label="Train Loss", color="#1f77b4", linewidth=2)
     axes[0].plot(epochs, history["val_loss"], label="Val Loss", color="#ff7f0e", linestyle="--", linewidth=2)
     axes[0].set_title("Training vs Validation Loss", fontsize=12, fontweight="bold")
@@ -216,7 +211,6 @@ def plot_training_curves(history: dict[str, list[float]], output_path: str | Pat
     axes[0].grid(True, linestyle=":", alpha=0.6)
     axes[0].legend()
 
-    # กราฟ Dice Score
     axes[1].plot(epochs, history["train_dice"], label="Train Dice", color="#2ca02c", linewidth=2)
     axes[1].plot(epochs, history["val_dice"], label="Val Dice", color="#d62728", linestyle="--", linewidth=2)
     axes[1].set_title("Training vs Validation Dice Score", fontsize=12, fontweight="bold")
@@ -244,12 +238,7 @@ def train_model(
     patience: int = 8,
 ) -> dict[str, list[float]]:
     """
-    Training pipeline หลัก:
-    - ฝึกฝนและประเมินผล
-    - Learning rate scheduler step
-    - บันทึก Best Model ตาม Validation Dice Score
-    - มีระบบ Early Stopping
-    - บันทึกกราฟผลลัพธ์
+    Execute full training pipeline with validation and early stopping.
     """
     device_obj = torch.device(device)
     model.to(device_obj)
@@ -317,4 +306,3 @@ def train_model(
     print(f"Training curves saved to: {plot_path}")
 
     return history
-

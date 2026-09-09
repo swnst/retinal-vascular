@@ -1,11 +1,11 @@
 """
 Optic Disk and Fovea Localization Module (Classical Pipeline)
 
-ดวิษ (Classical Pipeline) รับผิดชอบโมดูลนี้
-วิวรรธน์ (Deep Learning Pipeline) เรียกใช้ตาม Interface Agreement ใน ROADMAP.md
+Interface stub module defining the contract between Deep Learning front-end
+and Classical localization pipeline.
 
-ข้อกำหนดสำคัญ:
-vessel_map ที่ส่งเข้าฟังก์ชันต้องถูก resize กลับเป็นขนาดเท่าภาพต้นฉบับก่อนเสมอ
+Constraint:
+vessel_map passed to these functions must always be restored to original image dimensions.
 """
 
 import numpy as np
@@ -13,47 +13,47 @@ import numpy as np
 
 def find_optic_disk(vessel_map: np.ndarray, green_image: np.ndarray) -> tuple[int, int]:
     """
-    ตรวจหาพิกัดจุดศูนย์กลางของจานประสาทตา (Optic Disk - OD)
+    Detect the center coordinates of the Optic Disc (OD).
 
     Parameters
     ----------
     vessel_map : np.ndarray
-        ภาพ binary 2D array ขนาดเท่าภาพต้นฉบับ (0 หรือ 1 โดยที่ 1 = vessel)
+        Binary 2D array matching the original image dimensions (0 or 1, where 1 = vessel).
     green_image : np.ndarray
-        ภาพ green channel 2D array ขนาดเดียวกันกับ vessel_map
+        Green channel 2D array matching the vessel_map dimensions.
 
     Returns
     -------
     tuple[int, int]
-        พิกัดจุดศูนย์กลาง optic disk (x, y) ในระบบพิกัด pixel (x=col, y=row)
+        Center coordinates (x, y) of the optic disc in pixel space (x=col, y=row).
 
     Raises
     ------
     NotImplementedError
-        ฟังก์ชันนี้เป็น stub รอการ implement จากดวิษ (Classical Pipeline)
+        Interface stub awaiting implementation from classical pipeline.
     """
     raise NotImplementedError("find_optic_disk() is a stub and will be implemented by Dawit.")
 
 
 def find_fovea(vessel_map: np.ndarray, optic_disk_xy: tuple[int, int]) -> tuple[int, int]:
     """
-    ตรวจหาพิกัดจุดศูนย์กลางของจุดรับภาพชัด (Fovea)
+    Detect the center coordinates of the Fovea.
 
     Parameters
     ----------
     vessel_map : np.ndarray
-        ภาพ binary 2D array ขนาดเท่าภาพต้นฉบับ (0 หรือ 1 โดยที่ 1 = vessel)
+        Binary 2D array matching the original image dimensions (0 or 1, where 1 = vessel).
     optic_disk_xy : tuple[int, int]
-        พิกัด (x, y) ของจุดศูนย์กลาง Optic Disk ที่ตรวจพบได้ก่อนหน้า
+        Center coordinates (x, y) of the detected Optic Disc.
 
     Returns
     -------
     tuple[int, int]
-        พิกัดจุดศูนย์กลาง fovea (x, y) ในระบบพิกัด pixel (x=col, y=row)
+        Center coordinates (x, y) of the fovea in pixel space (x=col, y=row).
 
     Raises
     ------
     NotImplementedError
-        ฟังก์ชันนี้เป็น stub รอการ implement จากดวิษ (Classical Pipeline)
+        Interface stub awaiting implementation from classical pipeline.
     """
     raise NotImplementedError("find_fovea() is a stub and will be implemented by Dawit.")

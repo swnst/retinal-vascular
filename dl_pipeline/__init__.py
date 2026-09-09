@@ -1,1 +1,1 @@
-# Deep Learning pipeline (วิวรรธน์)
+# Deep Learning pipeline package

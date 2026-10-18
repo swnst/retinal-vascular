@@ -3,7 +3,7 @@ import pytest
 
 from matching.bifurcation import detect_bifurcations, detect_crossovers, filter_points_around_od
 from matching.matcher import extract_identity_template, match_templates, verify_identity
-from matching.skeleton import skeletonize_vessel
+from matching.skeleton import skeletonize_vessel, skeletonize_zhang_suen
 from matching.triangulation import build_delaunay_triangulation, compute_triangle_invariants
 
 
@@ -14,6 +14,14 @@ def test_skeletonize_vessel():
     skel = skeletonize_vessel(mask)
     assert skel.shape == mask.shape
     assert skel.sum() > 0
+
+    skel_zhang = skeletonize_zhang_suen(mask)
+    assert skel_zhang.shape == mask.shape
+    assert skel_zhang.sum() > 0
+
+    skel_lee = skeletonize_vessel(mask, method="lee")
+    assert skel_lee.shape == mask.shape
+    assert skel_lee.sum() > 0
 
 
 def test_bifurcation_detection_t_junction():

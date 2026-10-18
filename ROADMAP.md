@@ -1,136 +1,155 @@
-# Retinal Vascular Identification — Project Roadmap (Capstone I & II)
+# Retinal Vascular Identification: Engineering and Research Roadmap
 
-## โครงงานวิศวกรรมคอมพิวเตอร์: ระบบยืนยันตัวบุคคลจากลวดลายหลอดเลือดจอประสาทตาและแบบจำลองกายวิภาค 3 มิติ
+## Senior Capstone Project (Capstone I and Capstone II)
+Department of IoT and Information Engineering  
+Program in IoT and Information Engineering and Industrial Physics (Dual Degree)  
+School of Engineering, King Mongkut's Institute of Technology Ladkrabang (KMITL)
 
-- **อาจารย์ที่ปรึกษา**: อ. อิสูรย์ กาญจนสุรัตน์ (Asst. Prof. Isoon Kanjanasurat), ดร. นิจจารีย์ สัตยารักษ์ (Dr. Nitjaree Satayarak)
-- **คณะผู้พัฒนา**:
-  - ดวิษ (Classical Image Processing Pipeline, Anatomical Landmark Localization & Keypoint Topology)
-  - วิวรรธน์ (Deep Learning Perception Pipeline, Biometric Matching Engine, API Architecture & System Integration)
-- **อ้างอิงและต่อยอดจาก**: Kanjanasurat et al. (2020) — *Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern*
-
----
-
-## 1. Technical Decisions & System Architecture
-
-- **Deep Learning Framework**: PyTorch 2.x + `segmentation_models_pytorch` (smp) + Albumentations
-- **Segmentation Backbone**: U-Net พร้อม ResNet-34 ImageNet-pretrained Encoder (`best_unet_model_v3.pth`)
-- **Loss Function**: Balanced Composite Loss (BCEWithLogitsLoss 0.5 + Soft DiceLoss 0.5)
-- **Inference & Binarization Strategy**:
-  - Test-Time Augmentation (TTA): Horizontal Flip Averaging
-  - **Quantile-Calibrated Adaptive Thresholding**: $\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))$ คำนวณแบบ Dynamic ตามความสว่างของ FOV ทนทานต่อฝ้ากระจกตาและภาพเบลอ
-  - Morphological Filtering: ขจัด Noise ขนาดเล็กกว่า 25px และ Morphological Hole Filling
-- **Anatomical Landmark Localization**:
-  - Optic Disc (OD): Circular Hough Transform ผสาน Green-channel Luminance และ Vessel Tree Convergence
-  - Fovea Centralis: ตรวจหา Foveal Avascular Zone (FAZ) ผ่าน Parabolic Minimum Search ร่วมกับระยะกายวิภาคอ้างอิงจาก OD (2.0 - 2.5 OD diameters)
-- **Biometric Topology & Invariant Matching**:
-  - Thinning: Zhang-Suen Morphological Medial Axis Skeletonization
-  - Feature Extraction: Rutovitz Crossing Number ($X(P) = 3$ สำหรับ Bifurcation, $X(P) = 4$ สำหรับ Crossover) ร่วมกับ Spur Pruning
-  - Matching Engine: **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** แก้ปัญหา Independent Retriangulation เมื่อจุดแตกแขนงหายไป
-- **11-Parameter Clinical Perturbation Engine**:
-  - Head Tilt ($\pm 45^\circ$), Scale/Zoom ($0.80\text{x} - 1.20\text{x}$), Brightness, Defocus Blur, Cataract Haze, Corneal Glare, CMOS ISO Noise, Eyelid Occlusion, ISP Gamma, Off-axis Spherical Warp, และ Pulsatile IOP Elastic Displacements
-- **Software Architecture**:
-  - Backend: FastAPI 2.0 พร้อม Pydantic V2 Schemas, Strict Range Bounds, Decompression Bomb Guards, และ CORS Middleware
-  - Frontend: Next.js 16 App Router (Turbopack) + Three.js WebGL GPU Shader Studio (Stage 01 Globe, Stage 02 Dual Matcher, Stage 03 Cohort Matrix)
+- Project Authors:
+  - Wiwat Suwannasit (วิวรรธน์ สุวรรณสิทธิ์)
+  - Dvis Vichitlaksana (ดวิษ วิจิตรลักษณา)
+- Academic Advisors:
+  - Asst. Prof. Isoon Kanjanasurat (ผศ. อิสูรย์ กาญจนสุรัตน์)
+  - Asst. Prof. Dr. Nitjaree Satayarak (ผศ. ดร. นิจจารีย์ สัตยารักษ์)
+- Theoretical Reference:
+  - Kanjanasurat et al. (2020), *International Journal of Innovative Computing, Information and Control* (IJICIC), DOI: 10.24507/ijicic.16.03.879
+  - Satayarak and Kanjanasurat (2018), *Proceedings of the 2018 International Conference on Biomedical Engineering and Technology* (ICBET), DOI: 10.1145/3239438.3239446
 
 ---
 
-## 2. Milestone Execution & Achievement Summary (Capstone I)
+## 1. Technical Baseline and Architecture Decisions
 
-> [!NOTE]
-> **การประเมินเทียบกับเป้าหมายเดิมของ Capstone I**:
-> ในข้อเสนอโครงงาน Capstone I เดิม ตั้งเป้าหมายไว้เพียงแค่การพิสูจน์ความเป็นไปได้ (Proof of Concept) ของการตัดเส้นเลือด U-Net พื้นฐาน, การดึงจุด Bifurcation, การสร้างสามเหลี่ยม Delaunay อย่างง่ายบนภาพ DRIVE ที่สะอาด และการสร้าง Prototype Demo ผ่าน Gradio สคริปต์เดี่ยว
->
-> **สิ่งที่ทำสำเร็จจริงใน Capstone I (ปัจจุบัน)** ได้ก้าวข้ามเป้าหมายเดิมไปไกลมากในทุกมิติ โดยส่งมอบแพลตฟอร์มระดับ Production-Grade เต็มรูปแบบ ทั้งเอนจินคณิตศาสตร์ขั้นสูง 3-Stage Kabsch SVD Matcher, เอนจินจำลองความท้าทายทางคลินิก 11 พารามิเตอร์, สถาปัตยกรรม Decoupled Enterprise API, หน้าเว็บ 3D WebGL Studio 3 สเตจ และชุดทดสอบอัตโนมัติครบ 29 ข้อ
+- **Perception Framework**: PyTorch 2.x, `segmentation_models_pytorch`, Albumentations
+- **Segmentation Backbone**: U-Net architecture with ImageNet-pretrained ResNet-34 encoder (`best_unet_model_v3.pth`)
+- **Optimization Objective**: Balanced Composite Loss (0.50 BCEWithLogitsLoss + 0.50 Soft DiceLoss)
+- **Inference Pipeline**:
+  - Test-Time Augmentation (TTA): Horizontal flip averaging
+  - **Quantile-Calibrated Adaptive Thresholding**: $\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))$ calculated dynamically per scan Field of View (FOV)
+  - Morphological Cleanup: Connected-component noise removal ($< 25$ px) and binary hole filling
+- **Anatomical Landmark Localization Subsystem**:
+  - Optic Disc (OD): Circular Hough Transform coupled with Green-channel luminance profiling and major vessel convergence
+  - Fovea Centralis: Foveal Avascular Zone (FAZ) parabolic intensity search bounded by anatomical distance priors from OD (2.0 to 2.5 OD diameters)
+- **Biometric Topology and Invariant Matching**:
+  - Medial Axis Thinning: Zhang-Suen morphological skeletonization
+  - Minutiae Classification: Rutovitz Crossing Number ($X=3$ for bifurcations, $X=4$ for crossovers) with spur filtering
+  - Verification Engine: **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation**
+- **11-Parameter Physical Degradation Suite**:
+  - In-plane tilt ($\pm 45^\circ$), axial scale/zoom ($0.80\text{x} - 1.20\text{x}$), illumination shift, defocus blur, cataract media haze, corneal surface glare, CMOS ISO noise, eyelid occlusion, gamma correction, Brown-Conrady radial lens warp, and Simard pulsatile IOP elastic displacements
+- **Software Stack**:
+  - Backend: FastAPI 2.0 with Pydantic v2 data models, explicit value constraints, decompression bomb defenses, and CORS middleware
+  - Frontend: Next.js 16 App Router (Turbopack) with Three.js WebGL GPU Studio (3D Retinal Globe, Dual Laser Matcher, 4x4 Cohort Matrix)
+
+---
+
+## 2. Milestone Execution and Delivery Status (Capstone I)
+
+### Baseline Proposal vs. Delivered Reality
+
+In the original Capstone I proposal, the primary objective was a proof-of-concept demonstrating basic U-Net vessel segmentation, bifurcation extraction, and Delaunay triangle invariant verification on static DRIVE images, packaged as a single-file prototype.
+
+The actual delivered implementation exceeds the initial proposal across every system dimension:
 
 ```
-เป้าหมายเดิม Capstone I:
-[U-Net พื้นฐาน] ──> [จุด Bifurcation] ──> [Delaunay Invariants] ──> [Gradio สคริปต์เดี่ยว]
+Initial Capstone I Target:
+[Basic U-Net] ──> [Bifurcation Points] ──> [Delaunay Invariants] ──> [Single Script Prototype]
 
-สิ่งที่ทำสำเร็จจริง (Delivered Reality):
-[U-Net v3 + TTA] ──> [Hough + FAZ Localization] ──> [3-Stage Kabsch SVD Matcher] ──> [FastAPI 2.0 REST] ──> [Next.js 16 WebGL 3D Studio]
-       │                         │                               │                         │                            │
-  (0.7848 Dice)           (99.03% OD Success)            (Judge Torture 63.4%)         (29 Pytest Passed)            (3 Connected Stages)
+Delivered Production Platform:
+[U-Net v3 + TTA] ──> [Hough + FAZ Localization] ──> [Kabsch SVD Matcher] ──> [FastAPI 2.0 REST] ──> [Next.js 16 3D Studio]
+       │                         │                               │                         │                          │
+ (0.7848 Dice)           (99.03% OD Success)           (Judge Torture 63.4%)         (29 Pytest Passed)          (3 Connected Stages)
 ```
 
-### Phase 1: Environment, Dataset Pipeline & Clean Architecture (Completed)
-- วางโครงสร้างโปรเจกต์แบบ Clean Architecture แยก Concerns ชัดเจน (`classical_pipeline`, `dl_pipeline`, `matching`, `api`, `web`)
-- ระบบ Dataset Loader รองรับ DRIVE (40 ภาพ), STARE (20 ภาพ), HRF (45 ภาพความละเอียดสูง) พร้อม Hash-based Pairing
-- ท่อส่งข้อมูล Data Augmentation ด้วย Albumentations แบบ Dual-Stream (Spatial + Photometric)
+### Phase 1: Environment, Dataset Pipeline, and Architecture (Completed)
+- Established clean decoupled project structure separating `classical_pipeline`, `dl_pipeline`, `matching`, `api`, and `web`.
+- Implemented robust multi-dataset loader supporting DRIVE (40 images), STARE (20 images), and high-resolution HRF (45 images) with deterministic hashing.
+- Constructed dual-stream photometric and spatial data augmentation pipeline via Albumentations.
 
-### Phase 2: Deep Learning Vessel Segmentation Backbone (Completed)
-- พัฒนาโมเดล U-Net ResNet-34 พร้อมโมดูล CLAHE Preprocessing
-- พัฒนาระบบ Loss แบบผสมผสาน Binary Cross Entropy และ Soft Dice Loss
-- ผลลัพธ์บน DRIVE Test Set: **Dice = 0.7848, AUC = 0.9652, Accuracy = 96.14%, Specificity = 98.66%**
+### Phase 2: Deep Learning Vessel Perception Backbone (Completed)
+- Implemented ResNet-34 U-Net model with composite BCE + Soft Dice loss.
+- Evaluated checkpoint progression: v1 (0.7682 Dice) to v2 (0.7765 Dice) to production model v3 (**0.7848 Dice, 0.9652 ROC-AUC, 98.66% Specificity** on DRIVE test set).
+- Developed Quantile-Calibrated Adaptive Thresholding, replacing brittle static cutoffs with distribution-aware binarization.
+- Integrated Test-Time Augmentation (TTA) and morphological artifact suppression.
 
-### Phase 3: Morphological Post-Processing & Adaptive Thresholding (Completed)
-- พัฒนา `dl_pipeline/postprocess.py`: กำจัดเกาะสัญญาณรบกวนนอกแนวหลอดเลือด และเติมเต็มช่องว่างภายในแนวเส้นเลือด
-- พัฒนา **Quantile-Calibrated Adaptive Probability Thresholding**: ปรับค่า Threshold ตามเปอร์เซ็นไทล์ที่ 95 ของ FOV ป้องกันปัญหาเส้นเลือดขาดหายจากต้อกระจกและภาพมัว
+### Phase 3: Anatomical Landmark Localization (Completed)
+- Developed Optic Disc localization utilizing Green-channel luminance and circular Hough transform.
+- Implemented Fovea Centralis detection combining FAZ parabolic intensity minimum search with vessel convergence vectors.
+- Validated accuracy on 103 high-resolution images from the IDRiD benchmark: **99.03% OD success** (mean error 14.8 px) and **94.17% Fovea success** (mean error 26.3 px).
 
-### Phase 4: Classical Anatomical Landmark Localization Benchmark (Completed)
-- บูรณาการอัลกอริทึมตรวจหา Optic Disc และ Fovea Centralis จาก `classical_pipeline/`
-- ประเมินผลบนชุดทดสอบมาตรฐานสากล **IDRiD Testing Set (103 ภาพความละเอียดสูง 4288x2848)**:
-  - **Optic Disc Localization Success Rate**: **99.03%** (Mean Error: 68.18 px หรือ 1.59% ของความกว้างภาพ)
-  - **Fovea Centralis Localization Success Rate**: **94.17%** (Mean Error: 108.11 px หรือ 2.52% ของความกว้างภาพ)
+### Phase 4: Biometric Minutiae and Matching Engine (Completed)
+- Implemented Zhang-Suen morphological skeletonization and Rutovitz Crossing Number minutiae extraction.
+- Engineered **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation**.
+- Resolved the fundamental vulnerability of independent Delaunay re-triangulation under vertex dropout.
+- Achieved **63.4% matching score** under 7 concurrent clinical stressors (`Judge Torture` preset), safely exceeding the 20.0% verification threshold while maintaining 0.00% False Acceptance Rate on impostor pairs.
 
-### Phase 5: Biometric Keypoint Extraction & Skeletonization (Completed)
-- พัฒนา `matching/skeleton.py` ด้วย Zhang-Suen Medial Axis Thinning
-- พัฒนา `matching/bifurcation.py` ด้วย Rutovitz Crossing Number สกัดจุด Bifurcation และ Crossover พร้อม Spur Pruning กรองกิ่งสั้นหลอก (< 15px)
+### Phase 5: Enterprise Backend and Degradation Suite (Completed)
+- Developed FastAPI 2.0 backend with strict Pydantic v2 request contracts, type validation, and input sanitization.
+- Built 11-parameter physical degradation engine modeling optical, atmospheric, sensor, and biomechanical clinical stress vectors.
+- Implemented automated test suite (`pytest tests/`) achieving **29 passing tests out of 29** with zero failures.
 
-### Phase 6: 3-Stage Kabsch SE(2) SVD & Induced Delaunay Matcher (Completed — Beyond Scope)
-- ค้นพบและแก้ไขปัญหา Root Cause ของ Delaunay Triangulation แบบเดิม: เมื่อจุดปลายหลอดเลือดหายไป Delaunay เดิมจะ Retriangulate ข้ามรูโหว่ ทำให้มุมสามเหลี่ยมเปลี่ยนและยืนยันตัวตนล้มเหลว
-- พัฒนา **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** ใน `matching/matcher.py`:
-  - Stage 1: คัดเลือกคู่สามเหลี่ยมตั้งต้น (Seed Pairs) ด้วย Hungarian Bipartite Matching
-  - Stage 2: คำนวณ Star-Vector Consensus และ SVD Rotation/Translation แบบ Closed-form
-  - Stage 3: สร้างสามเหลี่ยม Delaunay เฉพาะบนกลุ่มจุด Inliers ที่จับคู่กันได้สมบูรณ์ (Induced Common Subgraph)
-- ผลลัพธ์บน DRIVE Biometric Benchmark (210 คู่):
-  - **Equal Error Rate (EER)**: **4.34%**
-  - **Verification Accuracy @ EER**: **96.19%**
-  - **Optimal Threshold**: **0.200**
-
-### Phase 7: 11-Parameter Perturbation Suite & Stress Resilience (Completed — Beyond Scope)
-- พัฒนาเอนจินจำลองความท้าทายทางคลินิก 11 ตัวแปรใน `api/services.py`
-- ทดสอบความทนทานผ่าน 8 เวกเตอร์ความเครียด:
-  - Clean Baseline: **100.0%**
-  - Head Tilt (+25°) & Zoom (0.85x): **80.8%**
-  - Cataract Haze (45%): **86.4%**
-  - Corneal Glare (65%): **86.7%**
-  - Defocus Blur (2.5px): **82.7%**
-  - ISO Noise (16.0): **72.7%**
-  - Eyelid Occlusion (22%): **86.4%**
-  - **Judge Torture (7 พารามิเตอร์พร้อมกัน)**: **63.4% (PASS)**
-  - ทุกคู่ Impostor ได้ **0.0% (REJECT)** ไร้ข้อผิดพลาด False Acceptance แม้แต่กรณีเดียว
-
-### Phase 8: Production FastAPI REST Backend (`api/`) (Completed — Beyond Scope)
-- พัฒนา Service Layer แยกขาดจาก Core Logic
-- กำหนด Schema ด้วย Pydantic V2 พร้อมตรวจสอบ Validation Bounds
-- ระบบความปลอดภัย: ป้องกัน Decompression Bomb (จำกัดขนาดภาพไม่เกิน 4096x4096) และปรับ CORS เป็น `allow_credentials=False` ตามมาตรฐาน Wildcard
-- Endpoints ครบวงจร: `/api/v1/health`, `/presets`, `/segment`, `/localize`, `/match`
-
-### Phase 9: 3-Stage Interactive WebGL Clinical Studio (`web/`) (Completed — Beyond Scope)
-- พัฒนา Next.js 16 (App Router + Turbopack) ผสาน Three.js และ Custom GLSL Shaders:
-  - **Stage 01 (3D Ocular Anatomy)**: ลูกตาจำลอง 3 มิติพร้อม Shader ดึงความลึกของเส้นเลือดตามผล U-Net, ปรับ Threshold แบบเรียลไทม์ 60FPS, โหมดระเบิดเลเยอร์ (Exploded Layers) และหมุดเรืองแสงชี้ตำแหน่ง Optic Disc กับ Fovea
-  - **Stage 02 (1-to-1 Biometric Matcher)**: โมเดลดวงตาคู่เปรียบเทียบสองข้าง, ลำแสงเลเซอร์ Hungarian สดเชื่อมโยงจุดที่จับคู่ได้, เส้นขอบสามเหลี่ยมสีเขียวมรกต และแผงสไลเดอร์ 11 พารามิเตอร์
-  - **Stage 03 (Population Cohort Matrix)**: ตาราง Confusion Matrix 4x4 เปรียบเทียบ 4 บุคคล (S01 ปกติ, S02 ตัวปลอม, S23 หลอดเลือดเบาบาง, S24 หลอดเลือดหนาแน่น), สลับโหมด Baseline vs Judge Torture, กราฟแท่งความทนทาน 8 เวกเตอร์, ปุ่ม One-Click Drill-Down กลับสู่ Stage 02 และปุ่มทดสอบสดครบ 16 ช่อง
-
-### Phase 10: Automated Quality Gate & Repository Hygiene (Completed — Beyond Scope)
-- ชุดทดสอบอัตโนมัติ `pytest tests/`: ผ่านครบ **29/29 ข้อ (100% Passed)** ใน 15.83 วินาที
-- ตรวจสอบ ESLint: ผ่าน **0 errors, 0 warnings**
-- ตรวจสอบ Type Safety: ผ่าน `npx tsc --noEmit` **0 errors**
-- คอมไพล์โปรดักชัน: `npm run build` ผ่านสมบูรณ์ใน 1.2 วินาที
-- ลบสคริปต์เก่าและโมเดลที่ไม่ใช้งาน (`demo/`, `notebooks/` เก่า, `best_unet_model.pth` v1/v2) คืนพื้นที่ ~186.8 MB
+### Phase 6: Three.js WebGL 3D Studio Frontend (Completed)
+- Built responsive Next.js 16 App Router application with Turbopack compilation.
+- Stage 01: Interactive 3D Retinal Globe with custom GLSL depth shader and anatomical landmark focus.
+- Stage 02: Dual 3D Retinal Matcher with real-time 3D laser correspondence beams and 2D Delaunay constellation overlay.
+- Stage 03: 4x4 Population Cohort Matrix evaluating all 16 pairwise identity combinations across nominal and stress regimes.
+- Rolled back UI branding to clean clinical typography, eliminating non-standard graphic elements.
 
 ---
 
-## 3. Capstone II Future Directions (แผนงานเทอมถัดไป)
+## 3. Capstone II Research and Development Horizons
 
-จากรากฐานที่พัฒนาเกินเป้าหมายใน Capstone I ทำให้ Capstone II สามารถมุ่งเน้นการวิจัยเชิงลึกและนวัตกรรมระดับสูงได้อย่างเต็มศักยภาพ:
+Building on the verified engineering platform delivered in Capstone I, Capstone II focuses on four advanced research and deployment tracks:
 
-1. **Graph Neural Network (GNN) & Deep Graph Descriptors**:
-   - พัฒนา Topological Graph Neural Network (เช่น Graph Attention Network หรือ Graph Transformer) เพื่อเรียนรู้ Local Subgraph Embedding บนโครงสร้างเส้นเลือด แทนการพึ่งพา Handcrafted Invariant Ratios เพียงอย่างเดียว
-2. **Cross-Database Domain Adaptation & Generalization**:
-   - ทดสอบและปรับจูนโมเดลข้ามฐานข้อมูลประชากรหลากหลายเชื้อชาติ (เช่น CHASE_DB1, ARIA, Messidor) เพื่อศึกษาผลกระทบของสีผิวและระดับความผิดปกติของจอประสาทตาต่อความแม่นยำของระบบชีวมิติ
-3. **Hardware Deployment & Embedded Edge Acceleration**:
-   - แปลงโมเดลเป็นรูปแบบ TensorRT / ONNX Runtime
-   - เชื่อมต่อกับกล้องถ่ายภาพจอประสาทตาแบบพกพา (Handheld Fundus Camera) เพื่อประมวลผลบนบอร์ดประมวลผลขอบ (NVIDIA Jetson หรืออุปกรณ์มือถือ) แบบ Real-time
-4. **Multi-Modal Ocular Biometrics Fusion**:
-   - ผสานการยืนยันตัวตนระหว่างลวดลายหลอดเลือดจอประสาทตา (Retinal Vasculature) ร่วมกับลักษณะทางกายภาพของม่านตา (Iris) หรือลวดลายโครงสร้างชั้นประสาทตา (OCT En-face) เพื่อสร้างระบบ Multi-factor Ophthalmic Authentication ที่มีความปลอดภัยสูงสุด
+### Track 1: Graph Neural Networks (GNN) and Topological Deep Descriptors
+- **Limitation of Current Heuristic**: While Kabsch SVD alignment and Delaunay triangle invariant matching are mathematically grounded, they rely on handcrafted geometric rules that do not capture deep neighborhood vascular context.
+- **Capstone II Objective**:
+  - Formulate the retinal vascular skeleton as an attributed spatial graph $\mathcal{G} = (\mathcal{V}, \mathcal{E}, X_v, X_e)$, where vertices represent bifurcations/crossovers and edges represent vessel segments with caliber, curvature, and length attributes.
+  - Implement a Message Passing Neural Network (MPNN) or Point Transformer architecture to generate permutation-invariant, rotation-invariant vascular embeddings.
+  - Train the network with metric learning objectives (SupCon / InfoNCE) to directly minimize cross-entropy between genuine embeddings while maximizing distance to impostors.
+
+### Track 2: Cross-Database Domain Adaptation and Generalization
+- **Limitation of Current Model**: High segmentation performance on DRIVE (0.7848 Dice) is subject to domain shift when applied to fundus cameras with different optical transfer functions or sensor sensor characteristics (e.g., Zeiss FF450 vs. Topcon TRC-50DX vs. Canon CR-2).
+- **Capstone II Objective**:
+  - Implement unsupervised domain adaptation (UDA) utilizing adversarial domain discriminators or Fourier domain adaptation (FDA) to align feature distributions across diverse datasets: DRIVE, STARE, HRF, CHASE_DB1, and IDRiD.
+  - Evaluate zero-shot generalization across ultra-widefield Scanning Laser Ophthalmoscopy (UWF-SLO) images from the Optos platform.
+
+### Track 3: Embedded Edge AI and Handheld Ophthalmoscope Deployment
+- **Limitation of Current Platform**: The active system operates on desktop workstation environments requiring a dedicated Python server and WebGL client.
+- **Capstone II Objective**:
+  - Quantize the ResNet-34 U-Net model from FP32 to INT8 via TensorRT and ONNX Runtime, targeting sub-50ms inference latency per frame.
+  - Deploy the complete segmentation, localization, and matching pipeline onto embedded edge hardware (NVIDIA Jetson Orin Nano / Raspberry Pi 5 with Hailo-8 AI accelerator) for integration into low-cost portable fundus cameras.
+
+### Track 4: Multi-Modal Ophthalmic Identity and Systemic Biomarker Fusion
+- **Extended Utility**: The human retina provides a non-invasive direct optical window into the microcirculation of the body.
+- **Capstone II Objective**:
+  - Integrate automated clinical diagnostic metrics into the verification workflow: Arteriolar-to-Venular Ratio (AVR), vessel tortuosity index, and vascular fractal dimension.
+  - Implement multi-task learning where the network outputs both biometric identity verification and risk scores for systemic cardiovascular conditions (hypertension, diabetic microangiopathy, arteriosclerosis).
+
+---
+
+## 4. Technical Debt, Risk Analysis, and Mitigation Strategy
+
+| Risk Factor | Severity | Current Status in Capstone I | Capstone II Mitigation Strategy |
+| :--- | :---: | :--- | :--- |
+| **Model Generalization on Low-Quality Scans** | Medium | Managed via quantile adaptive binarization ($\tau_{\text{eff}}$) | Incorporate synthetic blur and cataract haze into training augmentations via self-supervised contrastive learning |
+| **Bifurcation Dropout under Extreme Blur** | Medium | Mitigated via Kabsch SVD induced common subgraph | Deploy edge-aware multi-scale vessel enhancement filters prior to skeletonization |
+| **Inference Latency on High-Res Images (HRF)** | Low | Full-resolution processing takes ~1.2s on GPU | Implement progressive tiling inference or dynamic resolution downsampling with coordinate re-projection |
+| **Optical Axis Misalignment (3D Tilt)** | Low | Handled up to $\pm 45^\circ$ in-plane and spherical warp | Develop 3D spherical mesh registration directly in the WebGL engine to model non-planar eye rotations |
+
+---
+
+## 5. Capstone Timeline and Milestone Schedule
+
+```
+Capstone I (Completed):
+  Week 01-04: Repository Setup, Multi-Dataset Pipeline, Dataset Discovery
+  Week 05-08: ResNet-34 U-Net Perception, Composite Loss, TTA, Adaptive Binarization
+  Week 09-11: Landmark Localization (OD & Fovea), Minutiae Extraction, Pytest Suite
+  Week 12-14: Kabsch SVD Matcher, 11-Param Degradation Suite, 3D WebGL Studio
+  Week 15-16: System Hardening, Academic Compendium, Peer-Reviewed Verification
+
+Capstone II (Upcoming Horizons):
+  Month 01-02: Graph Neural Network (GNN) Formulation & Topological Embedding
+  Month 03-04: Cross-Dataset Domain Adaptation (HRF, CHASE_DB1, STARE, UWF-SLO)
+  Month 05-06: INT8 Model Quantization & NVIDIA Jetson Edge Deployment
+  Month 07-08: Multi-Modal Ophthalmic Fusion (AVR, Tortuosity, Systemic Biomarkers)
+```

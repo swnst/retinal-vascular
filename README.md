@@ -215,47 +215,67 @@ retinal-vascular/
 │   └── services.py                    # Pipeline orchestration and 11-param degradation engine
 ├── classical_pipeline/                # Anatomical Landmark Localization Subsystem
 │   ├── fovea_localization.py          # FAZ parabolic search and directional vessel search
+│   ├── localization.py                # Coordinate transforms and anatomical landmark heuristics
 │   ├── localization_api.py            # Unified landmark extraction interface
 │   ├── optic_disc_localization.py     # Circular Hough and Green-channel luminance detection
 │   └── skeleton_metrics.py            # Geometric vessel caliber and density metrics
 ├── dl_pipeline/                       # Deep Learning Perception Subsystem
+│   ├── data_utils.py                  # Multi-dataset sample discovery (DRIVE, STARE, HRF, CHASE)
 │   ├── dataset.py                     # Dual-stream dataset loader with Albumentations
 │   ├── model.py                       # ResNet-34 U-Net network architecture
 │   ├── postprocess.py                 # Quantile adaptive thresholding and morphological cleanup
 │   ├── predict.py                     # TTA-augmented batch/single inference
-│   └── train.py                       # Composite loss trainer with validation checkpoints
-├── docs/                              # Project Documentation and Knowledge Base
-│   └── references/                    # Academic Foundation
-│       ├── MASTER_REFERENCE_COMPENDIUM.md  # Equations, derivations, and codebase mapping
-│       └── references.bib             # Verified BibTeX citations (27 entries)
+│   └── train.py                       # Tripartite loss trainer (BCE + Dice + clDice)
+├── evaluation/                        # Empirical Benchmark and Metric Evaluation Suite
+│   ├── compare_models.py              # Comparative performance benchmarks across checkpoints
+│   ├── evaluate_localization.py       # IDRiD landmark detection accuracy and error radii
+│   ├── evaluate_matching.py           # Verification ROC/DET curves and EER metrics
+│   ├── evaluate_vessel.py             # Vessel segmentation benchmark runner (DRIVE, STARE, HRF)
+│   ├── metrics.py                     # Standardized metrics (Dice, IoU, AUC, F1, Specificity)
+│   └── threshold_analysis.py          # Adaptive binarization threshold sweep engine
 ├── matching/                          # Biometric Matching Engine
 │   ├── bifurcation.py                 # Rutovitz Crossing Number minutiae extraction
 │   ├── matcher.py                     # Kabsch SVD alignment and induced subgraph matching
-│   ├── skeleton.py                    # Zhang-Suen morphological thinning
+│   ├── skeleton.py                    # Zhang-Suen and Lee medial axis thinning with spur pruning
 │   └── triangulation.py               # Delaunay triangulation and invariant geometry
-├── models/
+├── models/                            # Local Model Weights (Excluded from Git via .gitignore)
 │   └── best_unet_model_v3.pth         # Active production checkpoint (93.39 MB, ResNet-34)
+├── notebooks/                         # Google Colab & Cloud GPU Training Workflows
+│   └── train_colab_v2.ipynb           # Cloud training notebook for ResNet-34 U-Net
+├── results/                           # Quantitative Benchmark Reports and Visual Artifacts
+│   ├── localization/                  # Landmark localization evaluation reports and CSVs
+│   │   ├── idrid_localization_results.csv
+│   │   └── localization_evaluation_report.md
+│   ├── matching/                      # Biometric matching reports, ROC curves, and scores
+│   │   ├── biometric_matching_curves.png
+│   │   ├── matching_evaluation_report.md
+│   │   └── matching_score_records.csv
+│   ├── threshold_optimization_report.md   # Adaptive thresholding sweep results
+│   ├── threshold_optimization_results.csv # Binarization parameter grid search records
+│   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
 ├── tests/                             # Automated Pytest Suite (29 unit & integration tests)
 │   ├── test_api.py                    # REST endpoint and schema validation tests
 │   ├── test_localization_api.py       # Optic disc and fovea localization tests
-│   ├── test_matching.py               # Zhang-Suen, Rutovitz, and Delaunay matching tests
+│   ├── test_matching.py               # Zhang-Suen, Lee, Rutovitz, and Delaunay matching tests
 │   ├── test_postprocess.py            # Morphological cleanup and adaptive binarization tests
 │   ├── test_week1_and_week2.py        # Dataset loading and metric validation tests
 │   └── test_week3_and_week4.py        # U-Net forward pass, loss, and early stopping tests
-└── web/                               # Next.js 16 WebGL 3D Studio Frontend
-    ├── package.json                   # Dependencies (Next 16.4.2, React 19, Three.js, Lucide)
-    ├── src/
-    │   ├── app/
-    │   │   ├── globals.css            # Medical typography, grid layouts, and color tokens
-    │   │   ├── layout.tsx             # Root layout with Geist Mono font and metadata
-    │   │   └── page.tsx               # 3-Stage Studio (Globe, Matcher, Cohort Matrix)
-    │   ├── components/
-    │   │   ├── DelaunayConstellation.tsx  # 2D Canvas keypoint and triangulation overlay
-    │   │   └── RetinalGlobe.tsx       # 3D Three.js sphere with GLSL depth shader
-    │   ├── lib/
-    │   │   └── api.ts                 # Type-safe fetch client and preset definitions
-    │   └── types/
-    │       └── biometrics.ts          # TypeScript interfaces matching backend Pydantic models
+├── web/                               # Next.js 16 WebGL 3D Studio Frontend
+│   ├── package.json                   # Dependencies (Next 16.4.2, React 19, Three.js, Lucide)
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── globals.css            # Medical typography, grid layouts, and color tokens
+│   │   │   ├── layout.tsx             # Root layout with Geist Mono font and metadata
+│   │   │   └── page.tsx               # 3-Stage Studio (Globe, Matcher, Cohort Matrix)
+│   │   ├── components/
+│   │   │   ├── DelaunayConstellation.tsx  # 2D Canvas keypoint and triangulation overlay
+│   │   │   └── RetinalGlobe.tsx       # 3D Three.js sphere with GLSL depth shader
+│   │   ├── lib/
+│   │   │   └── api.ts                 # Type-safe fetch client and preset definitions
+│   │   └── types/
+│   │       └── biometrics.ts          # TypeScript interfaces matching backend Pydantic models
+├── .gitignore                         # Git exclusion rules for large models, data, and secrets
+└── requirements.txt                   # Complete Python dependencies (Core, DL, FastAPI, Pytest)
 ```
 
 ---
@@ -270,7 +290,7 @@ retinal-vascular/
 ### 6.1 Backend Setup
 1. Clone the repository and initialize the Python virtual environment:
    ```powershell
-   git clone https://github.com/your-org/retinal-vascular.git
+   git clone https://github.com/swnst/retinal-vascular.git
    cd retinal-vascular
    python -m venv .venv
    .\.venv\Scripts\Activate.ps1

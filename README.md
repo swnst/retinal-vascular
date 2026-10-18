@@ -38,7 +38,7 @@ The implemented platform exceeds the original targets across all core engineerin
 | **Clinical Robustness** | None (clean static scans only) | **11-Parameter Physical Degradation Suite**; passes 7-parameter `Judge Torture` stress at **63.4%** matching score (threshold: 20.0%) | Exceeded Target |
 | **Software Architecture** | Standalone Python scripts | **Decoupled Architecture**: FastAPI 2.0 Backend + Next.js 16 App Router Turbopack Frontend | Exceeded Target |
 | **Visualization and UI** | Static 2D plots | **3-Stage Three.js WebGL Studio**: 3D Retinal Globe with depth GLSL shader, Dual 3D Matcher with laser correspondence beams, and 4x4 Cohort Matrix | Exceeded Target |
-| **Automated Testing** | Manual inspection | **Automated Suite of 29 Pytest Tests**, ESLint (0 errors), Strict TypeScript (0 errors), Next.js Turbopack build | Exceeded Target |
+| **Automated Testing** | Manual inspection | **Automated Suite of 33 Pytest Tests**, ESLint (0 errors), Strict TypeScript (0 errors), Next.js Turbopack build | Exceeded Target |
 
 ---
 
@@ -116,14 +116,14 @@ $$2 \le B(P_1) \le 6, \quad A(P_1) = 1$$
 
 *Citations:*
 - Zhang, T. Y., and Suen, C. Y. (1984). A fast parallel algorithm for thinning digital patterns. *Communications of the ACM*, 27(3), 236-239. DOI: 10.1145/357994.358023.
-- Lee, T. C., Kashyap, R. L., and Chu, C. N. (1994). Building skeleton models via 3-D medial surface/axis thinning algorithms. *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 16(4), 351-360. DOI: 10.1109/34.277590.
+- Lee, T.-C., Kashyap, R. L., and Chu, C.-N. (1994). Building Skeleton Models via 3-D Medial Surface Axis Thinning Algorithms. *CVGIP: Graphical Models and Image Processing*, 56(6), 462-478. DOI: 10.1006/cgip.1994.1042.
 
 ### 3.5 Minutiae Extraction (Rutovitz Crossing Number)
 Classifies skeleton pixels into terminal endpoints ($X=1$), vessel continuations ($X=2$), bifurcations ($X=3$), and crossovers ($X=4$):
 
 $$X(P) = \frac{1}{2} \sum_{i=1}^8 \left| P_i - P_{i+1} \right|, \quad P_9 = P_1$$
 
-*Citation:* Rutovitz, D. (1966). Pattern recognition. *Journal of the Royal Statistical Society: Series A*, 129(4), 504-530. DOI: 10.2307/2982247.
+*Citation:* Rutovitz, D. (1966). Pattern recognition. *Journal of the Royal Statistical Society: Series A*, 129(4), 504-530. DOI: 10.2307/2982255.
 
 ### 3.6 Closed-Form Spatial Alignment (Kabsch SVD Procrustes)
 Derives the optimal rigid rotation matrix $R \in \text{SO}(2)$ and translation vector $t \in \mathbb{R}^2$ minimizing root-mean-square alignment deviation:
@@ -215,6 +215,7 @@ retinal-vascular/
 │   ├── schemas.py                     # Pydantic v2 data contracts with strict range bounds
 │   └── services.py                    # Pipeline orchestration and 11-param degradation engine
 ├── classical_pipeline/                # Anatomical Landmark Localization Subsystem
+│   ├── bezier_matched_filter.py       # Bézier curve matched filter baseline (Kanjanasurat 2020)
 │   ├── fovea_localization.py          # FAZ parabolic search and directional vessel search
 │   ├── localization.py                # Coordinate transforms and anatomical landmark heuristics
 │   ├── localization_api.py            # Unified landmark extraction interface
@@ -254,8 +255,9 @@ retinal-vascular/
 │   ├── threshold_optimization_report.md   # Adaptive thresholding sweep results
 │   ├── threshold_optimization_results.csv # Binarization parameter grid search records
 │   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
-├── tests/                             # Automated Pytest Suite (29 unit & integration tests)
+├── tests/                             # Automated Pytest Suite (33 unit & integration tests)
 │   ├── test_api.py                    # REST endpoint and schema validation tests
+│   ├── test_bezier_matched_filter.py  # Bézier curve matched filter baseline tests
 │   ├── test_localization_api.py       # Optic disc and fovea localization tests
 │   ├── test_matching.py               # Zhang-Suen, Lee, Rutovitz, and Delaunay matching tests
 │   ├── test_postprocess.py            # Morphological cleanup and adaptive binarization tests
@@ -303,7 +305,7 @@ retinal-vascular/
    ```powershell
    pytest tests/ -v
    ```
-   *Expected outcome: 29 passed in ~16s.*
+   *Expected outcome: 33 passed in ~16s.*
 4. Start the FastAPI backend server:
    ```powershell
    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload

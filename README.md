@@ -13,8 +13,9 @@ School of Engineering, King Mongkut's Institute of Technology Ladkrabang (KMITL)
   - Asst. Prof. Isoon Kanjanasurat (ผศ. อิสูรย์ กาญจนสุรัตน์)
   - Asst. Prof. Dr. Nitjaree Satayarak (ผศ. ดร. นิจจารีย์ สัตยารักษ์)
 - Foundational Literature:
-  - Kanjanasurat et al. (2020), *International Journal of Innovative Computing, Information and Control* (IJICIC), DOI: 10.24507/ijicic.16.03.879
-  - Satayarak and Kanjanasurat (2018), *Proceedings of the 2018 International Conference on Biomedical Engineering and Technology* (ICBET), DOI: 10.1145/3239438.3239446
+  - Kanjanasurat et al. (2020), "Vascular Extraction by using matched filter on retinal image", *Journal of Physics: Conference Series*, DOI: 10.1088/1742-6596/1457/1/012013
+  - Kanjanasurat, Purahong, Pintavirooj, Satayarak, and Benjangkaprasert (2020), "Blood Vessel Extraction and Optic Disk Localization for Diabetic Retinopathy", *ACM ICBET*, DOI: 10.1145/3397391.3397425
+  - Kanjanasurat et al. (2020), "Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern", *IJICIC*, Vol. 16, No. 3, pp. 879-897, URL: http://www.ijicic.org/ijicic-160307.pdf
 
 ---
 
@@ -141,9 +142,9 @@ $$C(i, j) = 0.55 \cdot \frac{\Delta\bar{\theta}}{\tau_\theta} + 0.25 \cdot \min_
 To prevent catastrophic false rejections from vertex dropout where independent Delaunay graphs re-triangulate into conflicting topologies, VERA executes **Induced Common-Subgraph Delaunay Triangulation**:
 1. Spatial Minutiae Consensus: Bifurcation points from Scan A and Scan B are aligned globally into a unified frame using Kabsch SE(2) SVD consensus.
 2. Mutual Inlier Gating: Global bipartite assignment identifies the mutual inlier point subset $\mathcal{P}\_{\text{mutual}} = \mathcal{P}\_A \cap \mathcal{P}\_B$.
-3. Induced Graph Triangulation: Delaunay triangulation is constructed over the shared subset $\mathcal{P}_{\text{mutual}}$, guaranteeing identical topological connectivity between both scans.
+3. Induced Graph Triangulation: Delaunay triangulation is constructed over the shared subset $\mathcal{P}\_{\text{mutual}}$, guaranteeing identical topological connectivity between both scans.
 
-*Citation:* Kanjanasurat, I., Purahong, B., Aoyama, H., Benjangkaprasert, C., and Pintavirooj, C. (2020). Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern. *IJICIC*, 16(3), 879-894. DOI: 10.24507/ijicic.16.03.879.
+*Citation:* Kanjanasurat, I., Purahong, B., Aoyama, H., Benjangkaprasert, C., and Pintavirooj, C. (2020). Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern. *IJICIC*, 16(3), 879-897. URL: http://www.ijicic.org/ijicic-160307.pdf.
 
 ### 3.8 Bipartite Assignment (Kuhn-Munkres)
 Finds optimal bijective correspondence between transformed candidate minutiae and target minutiae:

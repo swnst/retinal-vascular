@@ -231,11 +231,11 @@ class PipelineService:
 
         keypoints_list: list[dict[str, float]] = []
         if compute_skeleton:
-            from skimage.morphology import skeletonize
+            from matching.skeleton import skeletonize_zhang_suen
             from classical_pipeline.skeleton_metrics import prune_short_spurs
             from matching.bifurcation import detect_bifurcations
 
-            skel = skeletonize(binary_mask > 0)
+            skel = skeletonize_zhang_suen(binary_mask) > 0
             skel = prune_short_spurs(skel, threshold=8) & fov_eroded
             bif_pts = detect_bifurcations(skel)
             keypoints_list = [{"x": float(p[0]), "y": float(p[1])} for p in bif_pts]

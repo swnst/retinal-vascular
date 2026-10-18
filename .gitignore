@@ -50,3 +50,25 @@ AGENTS.md
 .cursor/
 .windsurfrules
 .antigravity/
+
+# --- Internal Plans & Local Knowledge Base ---
+IMPLEMENTATION_PLAN.md
+ROADMAP.md
+docs/
+scratch/
+
+# --- Heavy Binary Visualization Outputs ---
+results/vessel_prediction_samples.png
+results/localization/visualizations/
+*.png.bak
+
+# --- Local Environment & Secret Protection ---
+.env
+.env.local
+.env.*.local
+
+# --- Local Tooling & IDE Caches ---
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/

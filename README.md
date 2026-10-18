@@ -31,7 +31,7 @@ The implemented platform exceeds the original targets across all core engineerin
 | Evaluation Dimension | Initial Capstone I Target | Delivered System Reality | Status |
 | :--- | :--- | :--- | :---: |
 | **Vessel Segmentation** | Standard U-Net (~0.70 Dice on DRIVE) | Dual-Stream Self-Consistent U-Net (`best_unet_model_v3.pth`) with ResNet-34 encoder reaching **0.7848 Dice, 0.9652 AUC, 98.66% Specificity** | Exceeded Target |
-| **Probability Binarization** | Static 0.50 cutoff | **Quantile-Calibrated Adaptive Thresholding** ($\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))$) resilient to cataract opacity | Exceeded Target |
+| **Probability Binarization** | Static 0.50 cutoff | **Quantile-Calibrated Adaptive Thresholding** ( $\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95})$ ) resilient to cataract opacity | Exceeded Target |
 | **Landmark Localization** | Basic center heuristic on DRIVE | Multi-stage Hough and Vessel Convergence on 103 high-resolution IDRiD images (**99.03% OD Success, 94.17% Fovea Success**) | Exceeded Target |
 | **Biometric Matcher** | Independent Delaunay Invariants (fails under vertex dropout) | **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** | Exceeded Target |
 | **Clinical Robustness** | None (clean static scans only) | **11-Parameter Physical Degradation Suite**; passes 7-parameter `Judge Torture` stress at **63.4%** matching score (threshold: 20.0%) | Exceeded Target |
@@ -140,7 +140,7 @@ $$C(i, j) = 0.55 \cdot \frac{\Delta\bar{\theta}}{\tau_\theta} + 0.25 \cdot \min_
 
 To prevent catastrophic false rejections from vertex dropout where independent Delaunay graphs re-triangulate into conflicting topologies, VERA executes **Induced Common-Subgraph Delaunay Triangulation**:
 1. Spatial Minutiae Consensus: Bifurcation points from Scan A and Scan B are aligned globally into a unified frame using Kabsch SE(2) SVD consensus.
-2. Mutual Inlier Gating: Global bipartite assignment identifies the mutual inlier point subset $\mathcal{P}_{\text{mutual}} = \mathcal{P}_A \cap \mathcal{P}_B$.
+2. Mutual Inlier Gating: Global bipartite assignment identifies the mutual inlier point subset $\mathcal{P}\_{\text{mutual}} = \mathcal{P}\_A \cap \mathcal{P}\_B$.
 3. Induced Graph Triangulation: Delaunay triangulation is constructed over the shared subset $\mathcal{P}_{\text{mutual}}$, guaranteeing identical topological connectivity between both scans.
 
 *Citation:* Kanjanasurat, I., Purahong, B., Aoyama, H., Benjangkaprasert, C., and Pintavirooj, C. (2020). Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern. *IJICIC*, 16(3), 879-894. DOI: 10.24507/ijicic.16.03.879.
@@ -148,7 +148,7 @@ To prevent catastrophic false rejections from vertex dropout where independent D
 ### 3.8 Bipartite Assignment (Kuhn-Munkres)
 Finds optimal bijective correspondence between transformed candidate minutiae and target minutiae:
 
-$$\min \sum_{i=1}^m \sum_{j=1}^n C_{i,j} X_{i,j}, \quad \text{where } C_{i,j} = \|R p_i + t - q_j\|_2$$
+$$\min \sum_{i=1}^m \sum_{j=1}^n C_{i,j} X_{i,j}, \quad \text{where } C_{i,j} = \lVert R p_i + t - q_j \rVert_2$$
 
 *Citation:* Kuhn, H. W. (1955). The Hungarian method for the assignment problem. *Naval Research Logistics Quarterly*, 2(1-2), 83-97. DOI: 10.1002/nav.3800020109.
 
@@ -158,11 +158,11 @@ Reduces geometric proximity queries from $O(N \cdot M)$ to $O(N \log M)$:
 *Citation:* Bentley, J. L. (1975). Multidimensional binary search trees used for associative searching. *Communications of the ACM*, 18(9), 509-517. DOI: 10.1145/361002.361007.
 
 ### 3.10 Optical and Physical Degradation Mechanics
-- **Scale-Invariant Radial Optical Lens Distortion:** $\tilde{r}_u = \frac{r_u}{r_{\max}}$, $x_{\text{dist}} = x_c + (x - x_c)(1 + k \tilde{r}_u^2)$ (Brown, 1966).
-- **Elastic Biomechanical Strain:** $d(x,y) = \alpha \cdot \frac{G_\sigma * \Delta}{\|G_\sigma * \Delta\|_\infty}$ (Simard et al., 2003).
-- **Cataract Media Opacity & Forward Straylight:** $I_{\text{cataract}}(x,y) = (1 - h) I(x,y) + h [0.65 L_{\text{veil}} + 0.35 (G_{\sigma=14} * I)(x,y)]$ with $L_{\text{veil}} = [210, 165, 125]$ (van den Berg, 1995; Vos & van den Berg, 1999).
+- **Scale-Invariant Radial Optical Lens Distortion:** $\tilde{r}\_{u} = \frac{r\_{u}}{r\_{\text{max}}}$, $x\_{\text{dist}} = x\_c + (x - x\_c)(1 + k \tilde{r}\_u^2)$ (Brown, 1966).
+- **Elastic Biomechanical Strain:** $d(x,y) = \alpha \cdot \frac{G_\sigma * \Delta}{\lVert G_\sigma * \Delta \rVert_\infty}$ (Simard et al., 2003).
+- **Cataract Media Opacity & Forward Straylight:** $I\_{\text{cataract}}(x,y) = (1 - h) I(x,y) + h [0.65 L\_{\text{veil}} + 0.35 (G\_{\sigma=14} * I)(x,y)]$ with $L\_{\text{veil}} = [210, 165, 125]$ (van den Berg, 1995; Vos & van den Berg, 1999).
 
-For complete derivations, variable mappings, and extended proofs, see [MASTER_REFERENCE_COMPENDIUM.md](file:///c:/Users/rocke/OneDrive/Documents/GitHub/retinal-vascular/docs/references/MASTER_REFERENCE_COMPENDIUM.md).
+For complete derivations, variable mappings, and extended theoretical proofs, refer to the project technical documentation.
 
 ---
 

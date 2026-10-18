@@ -32,7 +32,7 @@ The implemented platform exceeds the original targets across all core engineerin
 | Evaluation Dimension | Initial Capstone I Target | Delivered System Reality | Status |
 | :--- | :--- | :--- | :---: |
 | **Vessel Segmentation** | Standard U-Net (~0.70 Dice on DRIVE) | Dual-Stream Self-Consistent U-Net (`best_unet_model_v3.pth`) with ResNet-34 encoder reaching **0.7848 Dice, 0.9652 AUC, 98.66% Specificity** | Exceeded Target |
-| **Probability Binarization** | Static 0.50 cutoff | **Quantile-Calibrated Adaptive Thresholding** ($\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))$) resilient to cataract opacity | Exceeded Target |
+| **Probability Binarization** | Static 0.50 cutoff | **Quantile-Calibrated Adaptive Thresholding** ($`\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))`$) resilient to cataract opacity | Exceeded Target |
 | **Landmark Localization** | Basic center heuristic on DRIVE | Multi-stage Hough and Vessel Convergence on 103 high-resolution IDRiD images (**99.03% OD Success, 94.17% Fovea Success**) | Exceeded Target |
 | **Biometric Matcher** | Independent Delaunay Invariants (fails under vertex dropout) | **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** | Exceeded Target |
 | **Clinical Robustness** | None (clean static scans only) | **11-Parameter Physical Degradation Suite**; passes 7-parameter `Judge Torture` stress at **63.4%** matching score (threshold: 20.0%) | Exceeded Target |
@@ -109,7 +109,14 @@ where $S(X) = \text{ReLU}(X - \text{open}(X))$ performs differentiable soft skel
 - Milletari, F., Navab, N., and Ahmadi, S. A. (2016). V-Net: Fully Convolutional Neural Networks for Volumetric Medical Image Segmentation. *3DV 2016*, pp. 565-571. DOI: 10.1109/3DV.2016.79.
 - Shit, S. et al. (2021). clDice - a Novel Topology-Preserving Loss Function for Tubular Structure Segmentation. *CVPR 2021*, pp. 16560-16569. DOI: 10.1109/CVPR46437.2021.01629.
 
-### 3.4 Morphological Skeletonization (Zhang-Suen and Lee Medial Axis)
+### 3.4 Quantile-Calibrated Adaptive Thresholding
+To ensure robust foreground binarization across severe inter-patient illumination variance, media opacities, and cataract haze:
+
+$$\tau_{\text{eff}} = \max\left(0.32, \min\left(0.60, 0.65 \cdot p_{95}\right)\right)$$
+
+where $p_{95}$ is the 95th percentile intensity of the predicted foreground vascular probability map calculated strictly within the Field of View (FOV). Clamping to $[0.32, 0.60]$ prevents background noise breakthrough under high clarity while preserving faint vascular trunks under heavy scattering.
+
+### 3.5 Morphological Skeletonization (Zhang-Suen and Lee Medial Axis)
 Extracts unitary-width centerlines via parallel boundary pixel deletion based on neighbor count $B(P_1)$ and $0 \to 1$ transition count $A(P_1)$:
 
 $$2 \le B(P_1) \le 6, \quad A(P_1) = 1$$
@@ -118,14 +125,14 @@ $$2 \le B(P_1) \le 6, \quad A(P_1) = 1$$
 - Zhang, T. Y., and Suen, C. Y. (1984). A fast parallel algorithm for thinning digital patterns. *Communications of the ACM*, 27(3), 236-239. DOI: 10.1145/357994.358023.
 - Lee, T.-C., Kashyap, R. L., and Chu, C.-N. (1994). Building Skeleton Models via 3-D Medial Surface Axis Thinning Algorithms. *CVGIP: Graphical Models and Image Processing*, 56(6), 462-478. DOI: 10.1006/cgip.1994.1042.
 
-### 3.5 Minutiae Extraction (Rutovitz Crossing Number)
+### 3.6 Minutiae Extraction (Rutovitz Crossing Number)
 Classifies skeleton pixels into terminal endpoints ($X=1$), vessel continuations ($X=2$), bifurcations ($X=3$), and crossovers ($X=4$):
 
 $$X(P) = \frac{1}{2} \sum_{i=1}^8 \left| P_i - P_{i+1} \right|, \quad P_9 = P_1$$
 
 *Citation:* Rutovitz, D. (1966). Pattern recognition. *Journal of the Royal Statistical Society: Series A*, 129(4), 504-530. DOI: 10.2307/2982255.
 
-### 3.6 Closed-Form Spatial Alignment (Kabsch SVD Procrustes)
+### 3.7 Closed-Form Spatial Alignment (Kabsch SVD Procrustes)
 Derives the optimal rigid rotation matrix $R \in \text{SO}(2)$ and translation vector $t \in \mathbb{R}^2$ minimizing root-mean-square alignment deviation:
 
 $$H = \sum_{i=1}^k (p_i - \bar{p})(q_i - \bar{q})^T = U \Sigma V^T$$
@@ -133,7 +140,7 @@ $$R = V \begin{pmatrix} 1 & 0 \\ 0 & \det(V U^T) \end{pmatrix} U^T, \quad t = \b
 
 *Citation:* Kabsch, W. (1976). A solution for the best rotation to relate two sets of vectors. *Acta Crystallographica Section A*, 32(5), 922-923. DOI: 10.1107/S0567739476001873.
 
-### 3.7 Delaunay Invariant Geometry and Induced Common-Subgraph Matching
+### 3.8 Delaunay Invariant Geometry and Induced Common-Subgraph Matching
 Triangulates minutiae graphs and computes interior angle and side ratio invariant descriptors:
 
 $$\boldsymbol{\theta} = (\theta_{\min}, \theta_{\text{mid}}, \theta_{\max}), \quad \boldsymbol{\rho} = \left(\frac{a}{b}, \frac{b}{c}, \frac{a}{c}\right)$$
@@ -146,19 +153,19 @@ To prevent catastrophic false rejections from vertex dropout where independent D
 
 *Citation:* Kanjanasurat, I., Purahong, B., Aoyama, H., Benjangkaprasert, C., and Pintavirooj, C. (2020). Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern. *IJICIC*, 16(3), 879-897. URL: http://www.ijicic.org/ijicic-160307.pdf.
 
-### 3.8 Bipartite Assignment (Kuhn-Munkres)
+### 3.9 Bipartite Assignment (Kuhn-Munkres)
 Finds optimal bijective correspondence between transformed candidate minutiae and target minutiae:
 
 $$\min \sum_{i=1}^m \sum_{j=1}^n C_{i,j} X_{i,j}, \quad \text{where } C_{i,j} = \lVert R p_i + t - q_j \rVert_2$$
 
 *Citation:* Kuhn, H. W. (1955). The Hungarian method for the assignment problem. *Naval Research Logistics Quarterly*, 2(1-2), 83-97. DOI: 10.1002/nav.3800020109.
 
-### 3.9 Spatial Keypoint Indexing (k-d Tree)
+### 3.10 Spatial Keypoint Indexing (k-d Tree)
 Reduces geometric proximity queries from $O(N \cdot M)$ to $O(N \log M)$:
 
 *Citation:* Bentley, J. L. (1975). Multidimensional binary search trees used for associative searching. *Communications of the ACM*, 18(9), 509-517. DOI: 10.1145/361002.361007.
 
-### 3.10 Optical and Physical Degradation Mechanics
+### 3.11 Optical and Physical Degradation Mechanics
 - **Scale-Invariant Radial Optical Lens Distortion:** $\tilde{r}_u = \frac{r_u}{r_{\max}}$, $x_{\text{dist}} = x_c + (x - x_c)(1 + k \tilde{r}_u^2)$ (Brown, 1966).
 - **Elastic Biomechanical Strain:** $d(x,y) = \alpha \cdot \frac{G_\sigma * \Delta}{\lVert G_\sigma * \Delta \rVert_\infty}$ (Simard et al., 2003).
 - **Cataract Media Opacity & Forward Straylight:** $I_{\text{cataract}}(x,y) = (1 - h) I(x,y) + h [0.65 L_{\text{veil}} + 0.35 (G_{\sigma=14} * I)(x,y)]$ with $L_{\text{veil}} = [210, 165, 125]$ (van den Berg, 1995; Vos & van den Berg, 1999).
@@ -219,6 +226,7 @@ retinal-vascular/
 │   ├── fovea_localization.py          # FAZ parabolic search and directional vessel search
 │   ├── localization.py                # Coordinate transforms and anatomical landmark heuristics
 │   ├── localization_api.py            # Unified landmark extraction interface
+│   ├── localization_api_sanity_checks.py # Sanity verification suite for landmark localization
 │   ├── optic_disc_localization.py     # Circular Hough and Green-channel luminance detection
 │   └── skeleton_metrics.py            # Geometric vessel caliber and density metrics
 ├── dl_pipeline/                       # Deep Learning Perception Subsystem
@@ -240,11 +248,9 @@ retinal-vascular/
 │   ├── matcher.py                     # Kabsch SVD alignment and induced subgraph matching
 │   ├── skeleton.py                    # Zhang-Suen and Lee medial axis thinning with spur pruning
 │   └── triangulation.py               # Delaunay triangulation and invariant geometry
-├── models/                            # Local Model Weights (Excluded from Git via .gitignore)
-│   └── best_unet_model_v3.pth         # Active production checkpoint (93.39 MB, ResNet-34)
-├── notebooks/                         # Local Colab & Cloud GPU Training Workflows (Excluded from Git via .gitignore)
-│   └── train_colab_v2.ipynb           # Cloud training notebook for ResNet-34 U-Net
 ├── results/                           # Quantitative Benchmark Reports and Visual Artifacts
+│   ├── fovea/                         # Fovea localization hyperparameters
+│   │   └── best_config.json
 │   ├── localization/                  # Landmark localization evaluation reports and CSVs
 │   │   ├── idrid_localization_results.csv
 │   │   └── localization_evaluation_report.md
@@ -252,8 +258,13 @@ retinal-vascular/
 │   │   ├── biometric_matching_curves.png
 │   │   ├── matching_evaluation_report.md
 │   │   └── matching_score_records.csv
+│   ├── optic_disc/                    # Optic disc localization hyperparameters
+│   │   └── best_config.json
+│   ├── threshold_optimization_curves.png # Adaptive threshold parameter sweep visualization
 │   ├── threshold_optimization_report.md   # Adaptive thresholding sweep results
 │   ├── threshold_optimization_results.csv # Binarization parameter grid search records
+│   ├── training_curves.png            # U-Net v1/v2 training loss and validation Dice curves
+│   ├── training_curves_v2.png         # Production U-Net v3 training convergence history
 │   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
 ├── tests/                             # Automated Pytest Suite (33 unit & integration tests)
 │   ├── test_api.py                    # REST endpoint and schema validation tests
@@ -278,6 +289,7 @@ retinal-vascular/
 │   │   └── types/
 │   │       └── biometrics.ts          # TypeScript interfaces matching backend Pydantic models
 ├── .gitignore                         # Git exclusion rules for large models, data, and secrets
+├── README.md                          # Comprehensive project documentation and benchmark report
 └── requirements.txt                   # Complete Python dependencies (Core, DL, FastAPI, Pytest)
 ```
 

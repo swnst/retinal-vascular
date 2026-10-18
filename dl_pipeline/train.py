@@ -20,17 +20,63 @@ from torch.optim import Adam, Optimizer
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, _LRScheduler
 from torch.utils.data import DataLoader
 
+import torch.nn.functional as F
+
 from dl_pipeline.model import get_model
 from dl_pipeline.dataset import RetinalVesselDataset
 from dl_pipeline.data_utils import discover_dataset_samples
 
 
-class DiceLoss(nn.Module):
-    """
-    Dice Loss for binary segmentation:
-    Loss = 1 - (2 * |X ∩ Y| + smooth) / (|X| + |Y| + smooth)
-    """
+# --- Differentiable Morphological Skeletonization & Soft-clDice Loss ---
+class SoftSkeletonize(nn.Module):
+    def __init__(self, num_iter: int = 10) -> None:
+        super().__init__()
+        self.num_iter = num_iter
 
+    @staticmethod
+    def _soft_erode(img: torch.Tensor) -> torch.Tensor:
+        p1 = -F.max_pool2d(-img, (3, 1), (1, 1), (1, 0))
+        p2 = -F.max_pool2d(-img, (1, 3), (1, 1), (0, 1))
+        return torch.min(p1, p2)
+
+    @staticmethod
+    def _soft_dilate(img: torch.Tensor) -> torch.Tensor:
+        return F.max_pool2d(img, (3, 3), (1, 1), (1, 1))
+
+    def _soft_open(self, img: torch.Tensor) -> torch.Tensor:
+        return self._soft_dilate(self._soft_erode(img))
+
+    def forward(self, img: torch.Tensor) -> torch.Tensor:
+        skel = F.relu(img - self._soft_open(img))
+        for _ in range(self.num_iter - 1):
+            img = self._soft_erode(img)
+            delta = F.relu(img - self._soft_open(img))
+            skel = skel + F.relu(delta - skel * delta)
+        return skel
+
+
+class SoftClDiceLoss(nn.Module):
+    def __init__(self, num_iter: int = 10, smooth: float = 1e-5) -> None:
+        super().__init__()
+        self.soft_skel = SoftSkeletonize(num_iter=num_iter)
+        self.smooth = smooth
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        probs = torch.sigmoid(logits)
+        skel_pred = self.soft_skel(probs)
+        skel_true = self.soft_skel(targets)
+
+        tprec = ((skel_pred * targets).sum(dim=(1, 2, 3)) + self.smooth) / (
+            skel_pred.sum(dim=(1, 2, 3)) + self.smooth
+        )
+        tsens = ((skel_true * probs).sum(dim=(1, 2, 3)) + self.smooth) / (
+            skel_true.sum(dim=(1, 2, 3)) + self.smooth
+        )
+        cl_dice = (2.0 * tprec * tsens) / (tprec + tsens + self.smooth)
+        return 1.0 - cl_dice.mean()
+
+
+class DiceLoss(nn.Module):
     def __init__(self, smooth: float = 1e-6) -> None:
         super().__init__()
         self.smooth = smooth
@@ -47,28 +93,33 @@ class DiceLoss(nn.Module):
 
 
 class CombinedLoss(nn.Module):
-    """
-    Combined BCEWithLogitsLoss and DiceLoss.
-    Mitigates severe class imbalance in retinal blood vessels (~10-12% vessel pixels).
-    """
-
     def __init__(
         self,
-        bce_weight: float = 0.5,
-        dice_weight: float = 0.5,
+        bce_weight: float = 0.35,
+        dice_weight: float = 0.40,
+        cldice_weight: float = 0.25,
         pos_weight: float | None = None,
         smooth: float = 1e-6,
     ) -> None:
         super().__init__()
         self.bce_weight = bce_weight
         self.dice_weight = dice_weight
+        self.cldice_weight = cldice_weight
         p_weight = torch.tensor([pos_weight]) if pos_weight is not None else None
         self.bce = nn.BCEWithLogitsLoss(pos_weight=p_weight)
         self.dice = DiceLoss(smooth=smooth)
+        self.cldice = SoftClDiceLoss(num_iter=10, smooth=smooth)
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         bce_loss = self.bce(logits, targets)
         dice_loss = self.dice(logits, targets)
+        if self.cldice_weight > 0.0:
+            cldice_loss = self.cldice(logits, targets)
+            return (
+                (self.bce_weight * bce_loss)
+                + (self.dice_weight * dice_loss)
+                + (self.cldice_weight * cldice_loss)
+            )
         return (self.bce_weight * bce_loss) + (self.dice_weight * dice_loss)
 
 
@@ -233,7 +284,7 @@ def train_model(
     scheduler: Any | None = None,
     num_epochs: int = 30,
     device: str | torch.device = "cuda" if torch.cuda.is_available() else "cpu",
-    checkpoint_path: str | Path = "models/best_unet_model.pth",
+    checkpoint_path: str | Path = "models/best_unet_model_v3.pth",
     plot_path: str | Path = "results/training_curves.png",
     patience: int = 8,
 ) -> dict[str, list[float]]:

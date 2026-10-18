@@ -52,10 +52,38 @@ def triangle_internal_angles(
     return angles
 
 
+def canonicalize_triangle_vertices(
+    verts: list[list[float]],
+) -> tuple[list[list[float]], list[float], float, int]:
+    p0 = np.array(verts[0], dtype=np.float64)
+    p1 = np.array(verts[1], dtype=np.float64)
+    p2 = np.array(verts[2], dtype=np.float64)
+
+    d0 = float(np.linalg.norm(p1 - p2))
+    d1 = float(np.linalg.norm(p0 - p2))
+    d2 = float(np.linalg.norm(p0 - p1))
+
+    sides_with_idx = sorted([(d0, 0), (d1, 1), (d2, 2)], key=lambda x: x[0])
+    ordered_verts = [verts[idx] for _, idx in sides_with_idx]
+    sorted_sides = [s[0] for s in sides_with_idx]
+    max_side = max(1e-6, sorted_sides[2])
+    side_ratios = [sorted_sides[0] / max_side, sorted_sides[1] / max_side]
+
+    dx = ordered_verts[2][0] - ordered_verts[0][0]
+    dy = ordered_verts[2][1] - ordered_verts[0][1]
+    canonical_theta = float(math.atan2(dy, dx))
+
+    cross_z = (ordered_verts[1][0] - ordered_verts[0][0]) * (ordered_verts[2][1] - ordered_verts[0][1]) - (
+        ordered_verts[1][1] - ordered_verts[0][1]
+    ) * (ordered_verts[2][0] - ordered_verts[0][0])
+    chirality = 1 if cross_z >= 0.0 else -1
+
+    return ordered_verts, side_ratios, canonical_theta, chirality
+
+
 def compute_triangle_invariants(
     tri: Delaunay, pts_array: np.ndarray, min_area: float = 10.0
 ) -> list[dict[str, Any]]:
-    # Multi-attribute Invariant Descriptors based on Kanjanasurat et al. (2020)
     simplices = tri.simplices
     neighbors = tri.neighbors
     n_triangles = len(simplices)
@@ -90,14 +118,27 @@ def compute_triangle_invariants(
 
         if adjacent_ratios:
             adjacent_ratios.sort()
+            raw_verts = [
+                [float(pts_array[simplices[i][0]][0]), float(pts_array[simplices[i][0]][1])],
+                [float(pts_array[simplices[i][1]][0]), float(pts_array[simplices[i][1]][1])],
+                [float(pts_array[simplices[i][2]][0]), float(pts_array[simplices[i][2]][1])],
+            ]
+            ordered_verts, side_ratios, canonical_theta, chirality = canonicalize_triangle_vertices(raw_verts)
+            filtered_idx = len(triangle_features)
             triangle_features.append(
                 {
-                    "triangle_idx": i,
+                    "triangle_idx": filtered_idx,
+                    "triangle_index": filtered_idx,
+                    "simplex_index": i,
                     "simplex": simplices[i].tolist(),
+                    "vertices": ordered_verts,
                     "centroid": centroids[i],
                     "area": area_i,
                     "angles": angles_list[i],
                     "adjacent_ratios": adjacent_ratios,
+                    "side_ratios": side_ratios,
+                    "canonical_theta": canonical_theta,
+                    "chirality": chirality,
                 }
             )
 

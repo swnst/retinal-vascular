@@ -17,37 +17,48 @@ import numpy as np
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
+import cv2
 import albumentations as A
 
 from dl_pipeline.data_utils import discover_dataset_samples, DatasetName
 
 
+# --- Augmentation Pipelines ---
 def get_default_train_transform(img_size: int = 512) -> A.Compose:
-    """
-    Default Albumentations compose transform for training:
-    - Resize 512x512
-    - HorizontalFlip, VerticalFlip
-    - RandomRotate90
-    - RandomBrightnessContrast
-    """
     return A.Compose(
         [
-            A.Resize(img_size, img_size),
+            A.Resize(img_size, img_size, interpolation=cv2.INTER_LINEAR),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5),
-            A.RandomBrightnessContrast(p=0.5, brightness_limit=0.2, contrast_limit=0.2),
+            A.Affine(
+                scale=(0.80, 1.20),
+                rotate=(-45.0, 45.0),
+                translate_percent=(-0.05, 0.05),
+                interpolation=cv2.INTER_LINEAR,
+                mask_interpolation=cv2.INTER_NEAREST,
+                border_mode=cv2.BORDER_CONSTANT,
+                p=0.85,
+            ),
+            A.OneOf(
+                [
+                    A.RandomBrightnessContrast(
+                        brightness_limit=(-0.30, 0.30),
+                        contrast_limit=(-0.25, 0.25),
+                        p=1.0,
+                    ),
+                    A.RandomGamma(gamma_limit=(75, 135), p=1.0),
+                    A.CLAHE(clip_limit=2.5, tile_grid_size=(8, 8), p=1.0),
+                ],
+                p=0.75,
+            ),
         ]
     )
 
 
 def get_default_val_test_transform(img_size: int = 512) -> A.Compose:
-    """
-    Default Albumentations compose transform for validation/testing (Resize only).
-    """
     return A.Compose(
         [
-            A.Resize(img_size, img_size),
+            A.Resize(img_size, img_size, interpolation=cv2.INTER_LINEAR),
         ]
     )
 

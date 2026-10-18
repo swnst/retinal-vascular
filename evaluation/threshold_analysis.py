@@ -267,5 +267,5 @@ def run_threshold_analysis(
 
 if __name__ == "__main__":
     data_dir = PROJECT_ROOT / "data"
-    model_checkpoint = PROJECT_ROOT / "models" / "best_unet_model.pth"
+    model_checkpoint = PROJECT_ROOT / "models" / "best_unet_model_v3.pth"
     run_threshold_analysis(data_dir, model_checkpoint)

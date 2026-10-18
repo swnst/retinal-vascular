@@ -18,8 +18,8 @@ NEIGHBOR_OFFSETS = [
 ]
 
 
-def as_bool(image):
-    return image.astype(bool)
+def as_bool(image: np.ndarray) -> np.ndarray:
+    return image if image.dtype == np.bool_ else (image > 0)
 
 
 def skeleton_neighbor_count(skeleton):
@@ -115,8 +115,8 @@ def group_branchpoints(branchpoint_candidates):
     }
 
 
-def neighbor_coords(skeleton, y, x):
-    skeleton_bool = as_bool(skeleton)
+def neighbor_coords(skeleton: np.ndarray, y: int, x: int) -> list[tuple[int, int]]:
+    skeleton_bool = skeleton if skeleton.dtype == np.bool_ else (skeleton > 0)
     height, width = skeleton_bool.shape
 
     coords = []

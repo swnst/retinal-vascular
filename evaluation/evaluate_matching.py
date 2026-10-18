@@ -254,5 +254,5 @@ def evaluate_identity_matching(
 
 if __name__ == "__main__":
     drive_root = PROJECT_ROOT / "data" / "DRIVE"
-    model_checkpoint = PROJECT_ROOT / "models" / "best_unet_model.pth"
+    model_checkpoint = PROJECT_ROOT / "models" / "best_unet_model_v3.pth"
     evaluate_identity_matching(drive_root, model_checkpoint)

@@ -63,19 +63,29 @@ def estimate_fov_mask(image_bgr):
     )
     _, binary = cv2.threshold(
         gray,
-        8,
+        18,
         255,
         cv2.THRESH_BINARY,
     )
 
-    kernel = cv2.getStructuringElement(
+    open_kernel = cv2.getStructuringElement(
         cv2.MORPH_ELLIPSE,
-        (17, 17),
+        (9, 9),
+    )
+    binary = cv2.morphologyEx(
+        binary,
+        cv2.MORPH_OPEN,
+        open_kernel,
+    )
+
+    close_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (15, 15),
     )
     binary = cv2.morphologyEx(
         binary,
         cv2.MORPH_CLOSE,
-        kernel,
+        close_kernel,
     )
 
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
@@ -84,7 +94,11 @@ def estimate_fov_mask(image_bgr):
     )
 
     if num_labels <= 1:
-        raise ValueError("Cannot estimate a non-empty FOV mask.")
+        _, binary = cv2.threshold(gray, 8, 255, cv2.THRESH_BINARY)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, close_kernel)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
+        if num_labels <= 1:
+            raise ValueError("Cannot estimate a non-empty FOV mask.")
 
     largest_label = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
     fov = labels == largest_label

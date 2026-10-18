@@ -83,42 +83,58 @@ def _normalize_vessel_map(vessel_map: np.ndarray) -> np.ndarray:
     return vessel
 
 
-def _normalize_green_image(green_image: np.ndarray) -> np.ndarray:
-    array = _validate_2d_array("green_image", green_image)
-    if array.dtype == np.bool_:
-        raise TypeError("green_image must contain intensity values, not boolean data.")
+def _normalize_image_input(
+    image_input: np.ndarray,
+    color_order: str = "RGB",
+) -> np.ndarray:
+    array = np.asarray(image_input)
+    if array.size == 0:
+        raise ValueError("image input must not be empty.")
+    if not (np.issubdtype(array.dtype, np.number) or np.issubdtype(array.dtype, np.bool_)):
+        raise TypeError(f"image input must use numeric or boolean dtype; got {array.dtype}.")
+    if not np.all(np.isfinite(array)):
+        raise ValueError("image input contains NaN or Inf.")
 
-    intensity = array.astype(np.float32, copy=True)
-    minimum = float(intensity.min())
-    maximum = float(intensity.max())
-    if minimum < 0.0:
-        raise ValueError("green_image intensity values must be non-negative.")
-    if maximum <= 1.0:
-        intensity *= 255.0
-    elif maximum > 255.0:
-        raise ValueError("green_image values must be in [0,1] or [0,255].")
-
-    return np.rint(intensity).clip(0, 255).astype(np.uint8)
+    if array.ndim == 2:
+        if array.dtype == np.bool_:
+            raise TypeError("image input must contain intensity values, not boolean data.")
+        intensity = array.astype(np.float32, copy=True)
+        minimum = float(intensity.min())
+        maximum = float(intensity.max())
+        if minimum < 0.0:
+            raise ValueError("image input intensity values must be non-negative.")
+        if maximum <= 1.0:
+            intensity *= 255.0
+        elif maximum > 255.0:
+            raise ValueError("image input values must be in [0,1] or [0,255].")
+        uint8_2d = np.rint(intensity).clip(0, 255).astype(np.uint8)
+        return cv2.merge((uint8_2d, uint8_2d, uint8_2d))
+    elif array.ndim == 3 and array.shape[2] in (3, 4):
+        channels = array[:, :, :3].astype(np.float32, copy=True)
+        if float(channels.max()) <= 1.0:
+            channels *= 255.0
+        uint8_3d = np.rint(channels).clip(0, 255).astype(np.uint8)
+        # If input is RGB, convert to BGR for classical localization pipeline
+        if color_order.upper() == "RGB":
+            return cv2.cvtColor(uint8_3d, cv2.COLOR_RGB2BGR)
+        return uint8_3d
+    else:
+        raise ValueError(f"image input must be 2D (H, W) or 3D (H, W, 3/4); got shape {array.shape}.")
 
 
 def _aligned_inputs(
     vessel_map: np.ndarray,
-    green_image: np.ndarray,
+    green_or_color_image: np.ndarray,
+    color_order: str = "RGB",
 ) -> tuple[np.ndarray, np.ndarray]:
     vessel = _normalize_vessel_map(vessel_map)
-    green = _normalize_green_image(green_image)
-    if vessel.shape != green.shape:
+    color_bgr = _normalize_image_input(green_or_color_image, color_order=color_order)
+    if vessel.shape[:2] != color_bgr.shape[:2]:
         raise ValueError(
-            f"vessel_map shape {vessel.shape} does not match "
-            f"green_image shape {green.shape}."
+            f"vessel_map shape {vessel.shape[:2]} does not match "
+            f"image shape {color_bgr.shape[:2]}."
         )
-    return vessel, green
-
-
-def _green_to_bgr(green: np.ndarray) -> np.ndarray:
-    # The shared contract provides only green intensity. Repeating it preserves
-    # that information without inventing unavailable red/blue channels.
-    return cv2.merge((green, green, green))
+    return vessel, color_bgr
 
 
 def _load_selected_method(path: Path, config_type):
@@ -171,15 +187,15 @@ def _checked_output(
 def find_optic_disk(
     vessel_map: np.ndarray,
     green_image: np.ndarray,
+    color_order: str = "RGB",
 ) -> tuple[float, float]:
     """Return the optic-disc center as ``(x, y)`` in input coordinates.
 
-    ``vessel_map`` and ``green_image`` must be aligned full-image 2D arrays.
-    Binary vessel representations using bool, 0/1, or 0/255 are accepted.
+    ``vessel_map`` and ``green_image`` must be aligned full-image arrays.
+    ``green_image`` can be either a 2D grayscale/green array or a 3D color array.
     """
 
-    vessel, green = _aligned_inputs(vessel_map, green_image)
-    image_bgr = _green_to_bgr(green)
+    vessel, image_bgr = _aligned_inputs(vessel_map, green_image, color_order=color_order)
     fov_mask = estimate_fov_mask(image_bgr)
     result = detect_optic_disc_center(
         image_bgr,
@@ -191,7 +207,7 @@ def find_optic_disk(
     return _checked_output(
         "optic-disc result",
         (result.center_x, result.center_y),
-        vessel.shape,
+        vessel.shape[:2],
     )
 
 
@@ -199,12 +215,13 @@ def find_fovea(
     vessel_map: np.ndarray,
     optic_disk_xy: tuple[float, float],
     green_image: np.ndarray | None = None,
+    color_order: str = "RGB",
 ) -> tuple[float, float]:
     """Return the fovea center as ``(x, y)`` in input coordinates.
 
     The frozen best fovea method uses image darkness. ``green_image`` is thus
-    required even though it remains optional in the signature for a clear,
-    backward-compatible error when callers use the earlier two-argument plan.
+    required even though it remains optional in the signature for backward-compatibility.
+    ``green_image`` can be either a 2D grayscale/green array or a 3D color array.
     """
 
     if green_image is None:
@@ -213,9 +230,8 @@ def find_fovea(
             "a darkness/intensity response; intensity is not inferred from vessel_map."
         )
 
-    vessel, green = _aligned_inputs(vessel_map, green_image)
-    optic_disc = _validate_point("optic_disk_xy", optic_disk_xy, vessel.shape)
-    image_bgr = _green_to_bgr(green)
+    vessel, image_bgr = _aligned_inputs(vessel_map, green_image, color_order=color_order)
+    optic_disc = _validate_point("optic_disk_xy", optic_disk_xy, vessel.shape[:2])
     fov_mask = estimate_fov_mask(image_bgr)
     result = detect_fovea_center(
         image_bgr,
@@ -227,5 +243,5 @@ def find_fovea(
     return _checked_output(
         "fovea result",
         (result.center_x, result.center_y),
-        vessel.shape,
+        vessel.shape[:2],
     )

@@ -23,6 +23,7 @@ project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+import cv2
 import numpy as np
 from PIL import Image
 import torch
@@ -30,6 +31,9 @@ import torch.nn as nn
 
 from dl_pipeline.predict import predict_vessel_mask, load_model_checkpoint
 from dl_pipeline.data_utils import discover_dataset_samples
+from dl_pipeline.dataset import split_samples
+from dl_pipeline.postprocess import refine_vessel_mask
+from classical_pipeline.fovea_localization import estimate_fov_mask
 from evaluation.metrics import pixel_metrics, compute_auc_roc
 
 
@@ -39,7 +43,9 @@ def evaluate_samples(
     dataset_name: str,
     device: str | torch.device = "cpu",
     threshold: float = 0.60,
-    use_tta: bool = False,
+    use_tta: bool = True,
+    apply_postprocess: bool = True,
+    use_fov_mask: bool = True,
     max_eval_samples: int | None = None,
 ) -> dict[str, float]:
     """
@@ -70,15 +76,34 @@ def evaluate_samples(
             use_tta=use_tta,
         )
 
-        with Image.open(mask_path) as m_pil:
-            gt_mask = np.array(m_pil.convert("L"))
+        if apply_postprocess:
+            bin_mask = refine_vessel_mask(bin_mask, min_size=25, max_hole_size=15)
+
+        import gzip
+        import io
+        if str(mask_path).endswith(".gz"):
+            with gzip.open(mask_path, "rb") as gz_file:
+                with Image.open(io.BytesIO(gz_file.read())) as m_pil:
+                    gt_mask = np.array(m_pil.convert("L"))
+        else:
+            with Image.open(mask_path) as m_pil:
+                gt_mask = np.array(m_pil.convert("L"))
 
         if gt_mask.shape != bin_mask.shape:
             gt_resized = Image.fromarray(gt_mask).resize((bin_mask.shape[1], bin_mask.shape[0]), Image.NEAREST)
             gt_mask = np.array(gt_resized)
 
-        metrics = pixel_metrics(bin_mask, gt_mask, threshold=threshold)
-        auc = compute_auc_roc(prob_map, gt_mask)
+        fov = None
+        if use_fov_mask:
+            try:
+                bgr_img = cv2.imread(str(img_path))
+                if bgr_img is not None:
+                    fov = estimate_fov_mask(bgr_img)
+            except Exception:
+                fov = None
+
+        metrics = pixel_metrics(bin_mask, gt_mask, threshold=threshold, fov_mask=fov)
+        auc = compute_auc_roc(prob_map, gt_mask, fov_mask=fov)
 
         accs.append(metrics["accuracy"])
         sens.append(metrics["sensitivity"])
@@ -99,18 +124,39 @@ def evaluate_samples(
     }
 
 
-def generate_markdown_report(results: list[dict[str, float]], output_path: str | Path) -> str:
+def generate_markdown_report(
+    results_dataset: list[dict[str, float]],
+    val_result: dict[str, float] | None,
+    output_path: str | Path,
+) -> str:
     """
     Generate Markdown summary table report and save to disk.
     """
     lines = [
         "# Retinal Vessel Segmentation Evaluation Report",
         "",
-        "| Dataset | Samples | Accuracy (ACC) | Sensitivity (SE) | Specificity (SP) | F1 / Dice Score | AUC-ROC |",
+        "## 1. Held-out Validation Set (Zero Data Leakage)",
+        "",
+        "| Evaluation Split | Samples | Accuracy (ACC) | Sensitivity (SE) | Specificity (SP) | F1 / Dice Score | AUC-ROC |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
 
-    for r in results:
+    if val_result is not None:
+        lines.append(
+            f"| **{val_result['dataset']}** | {val_result['num_samples']} | "
+            f"{val_result['accuracy']:.4f} | {val_result['sensitivity']:.4f} | "
+            f"{val_result['specificity']:.4f} | {val_result['dice']:.4f} | {val_result['auc_roc']:.4f} |"
+        )
+
+    lines.extend([
+        "",
+        "## 2. Per-Dataset Evaluation (Inside-FOV Benchmark)",
+        "",
+        "| Dataset | Samples | Accuracy (ACC) | Sensitivity (SE) | Specificity (SP) | F1 / Dice Score | AUC-ROC |",
+        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: |",
+    ])
+
+    for r in results_dataset:
         lines.append(
             f"| **{r['dataset']}** | {r['num_samples']} | "
             f"{r['accuracy']:.4f} | {r['sensitivity']:.4f} | "
@@ -132,11 +178,13 @@ def run_full_evaluation(
     output_report_path: str | Path = "results/vessel_evaluation_report.md",
     device: str | torch.device = "cpu",
     threshold: float = 0.60,
-    use_tta: bool = False,
+    use_tta: bool = True,
+    apply_postprocess: bool = True,
+    use_fov_mask: bool = True,
     max_eval_samples: int | None = None,
 ) -> list[dict[str, float]]:
     """
-    Run evaluation across DRIVE, HRF, and STARE datasets.
+    Run evaluation across validation split and DRIVE, HRF, and STARE datasets.
     """
     if isinstance(model_or_checkpoint, (str, Path)):
         model = load_model_checkpoint(model_or_checkpoint, device=device)
@@ -146,6 +194,25 @@ def run_full_evaluation(
     data_p = Path(data_dir)
     results = []
 
+    # 1. Held-out validation split
+    all_samples = discover_dataset_samples(data_p, dataset_name="ALL")
+    val_samples = split_samples(all_samples, split="val", split_ratios=(0.8, 0.2, 0.0), seed=42)
+    val_res = None
+    if val_samples:
+        print(f"Evaluating Held-out Validation Set ({len(val_samples)} samples)...")
+        val_res = evaluate_samples(
+            model=model,
+            samples=val_samples,
+            dataset_name="Held-out Val Set (20%)",
+            device=device,
+            threshold=threshold,
+            use_tta=use_tta,
+            apply_postprocess=apply_postprocess,
+            use_fov_mask=use_fov_mask,
+            max_eval_samples=max_eval_samples,
+        )
+
+    # 2. Per-dataset evaluation
     for ds_name in ["DRIVE", "HRF", "STARE"]:
         ds_path = data_p / ds_name
         if not ds_path.exists():
@@ -162,11 +229,13 @@ def run_full_evaluation(
             device=device,
             threshold=threshold,
             use_tta=use_tta,
+            apply_postprocess=apply_postprocess,
+            use_fov_mask=use_fov_mask,
             max_eval_samples=max_eval_samples,
         )
         results.append(res)
 
-    generate_markdown_report(results, output_report_path)
+    generate_markdown_report(results, val_res, output_report_path)
     print(f"Evaluation report saved to: {output_report_path}")
     return results
 
@@ -175,11 +244,13 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Evaluate Vessel Segmentation Model")
-    parser.add_argument("--checkpoint", type=str, default="models/best_unet_model_v2.pth")
+    parser.add_argument("--checkpoint", type=str, default="models/best_unet_model_v3.pth")
     parser.add_argument("--data-dir", type=str, default="data")
     parser.add_argument("--output", type=str, default="results/vessel_evaluation_report.md")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--tta", action="store_true", help="Enable Test-Time Augmentation")
+    parser.add_argument("--no-tta", action="store_true", help="Disable Test-Time Augmentation")
+    parser.add_argument("--no-postprocess", action="store_true", help="Disable Morphological Postprocessing")
+    parser.add_argument("--no-fov", action="store_true", help="Disable FOV mask evaluation")
     parser.add_argument("--threshold", type=float, default=0.60)
     args = parser.parse_args()
 
@@ -188,6 +259,8 @@ if __name__ == "__main__":
         data_dir=args.data_dir,
         output_report_path=args.output,
         device=args.device,
-        use_tta=args.tta,
+        use_tta=not args.no_tta,
+        apply_postprocess=not args.no_postprocess,
+        use_fov_mask=not args.no_fov,
         threshold=args.threshold,
     )

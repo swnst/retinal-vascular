@@ -83,24 +83,26 @@ class TestWeek2DatasetAndUtils(unittest.TestCase):
         self.assertTrue(set(val_split).isdisjoint(set(test_split)))
 
     def test_dataset_item_shape_and_range(self):
-        root = Path("data/DRIVE")
-        create_synthetic_drive_sample(root)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "DRIVE"
+            create_synthetic_drive_sample(root)
 
-        ds = RetinalVesselDataset(root_dir=root, split="all", img_size=512)
-        self.assertGreater(len(ds), 0)
+            ds = RetinalVesselDataset(root_dir=root, split="all", img_size=512)
+            self.assertGreater(len(ds), 0)
 
-        sample = ds[0]
-        self.assertIn("image", sample)
-        self.assertIn("mask", sample)
-        self.assertIsInstance(sample["image"], torch.Tensor)
-        self.assertIsInstance(sample["mask"], torch.Tensor)
+            sample = ds[0]
+            self.assertIn("image", sample)
+            self.assertIn("mask", sample)
+            self.assertIsInstance(sample["image"], torch.Tensor)
+            self.assertIsInstance(sample["mask"], torch.Tensor)
 
-        self.assertEqual(sample["image"].shape, (3, 512, 512))
-        self.assertEqual(sample["mask"].shape, (1, 512, 512))
+            self.assertEqual(sample["image"].shape, (3, 512, 512))
+            self.assertEqual(sample["mask"].shape, (1, 512, 512))
 
-        self.assertGreaterEqual(float(sample["image"].min()), 0.0)
-        self.assertLessEqual(float(sample["image"].max()), 1.0)
-        self.assertTrue((sample["mask"] == 0).logical_or(sample["mask"] == 1).all())
+            self.assertGreaterEqual(float(sample["image"].min()), 0.0)
+            self.assertLessEqual(float(sample["image"].max()), 1.0)
+            self.assertTrue((sample["mask"] == 0).logical_or(sample["mask"] == 1).all())
 
 
 if __name__ == "__main__":

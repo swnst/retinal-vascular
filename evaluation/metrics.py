@@ -10,7 +10,12 @@ from typing import Any
 import numpy as np
 
 
-def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> dict[str, float]:
+def pixel_metrics(
+    pred: np.ndarray,
+    gt: np.ndarray,
+    threshold: float = 0.5,
+    fov_mask: np.ndarray | None = None,
+) -> dict[str, float]:
     """
     Calculate pixel-level classification metrics for binary vessel segmentation:
     - Accuracy = (TP + TN) / (TP + TN + FP + FN)
@@ -26,6 +31,8 @@ def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> d
         Ground truth binary mask (values 0 or 1, or bool) with identical shape to pred.
     threshold : float, optional
         Threshold used to binarize pred if not already binary (default: 0.5).
+    fov_mask : np.ndarray or None, optional
+        Binary mask of retinal Field of View. If provided, metrics are evaluated inside FOV only.
 
     Returns
     -------
@@ -34,7 +41,9 @@ def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> d
         {
             "accuracy": float,
             "sensitivity": float,
-            "specificity": float
+            "specificity": float,
+            "f1": float,
+            "dice": float
         }
     """
     pred_arr = np.asarray(pred)
@@ -57,6 +66,15 @@ def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> d
         gt_bin = gt_arr
     else:
         gt_bin = gt_arr > 0
+
+    if fov_mask is not None:
+        fov_arr = np.asarray(fov_mask) > 0
+        if fov_arr.shape != pred_arr.shape:
+            raise ValueError(
+                f"Shape mismatch: fov_mask shape {fov_arr.shape} does not match pred shape {pred_arr.shape}"
+            )
+        pred_bin = pred_bin[fov_arr]
+        gt_bin = gt_bin[fov_arr]
 
     tp = int(np.logical_and(pred_bin, gt_bin).sum())
     tn = int(np.logical_and(~pred_bin, ~gt_bin).sum())
@@ -85,7 +103,12 @@ def pixel_metrics(pred: np.ndarray, gt: np.ndarray, threshold: float = 0.5) -> d
     }
 
 
-def compute_auc_roc(prob_map: np.ndarray, gt: np.ndarray, max_samples: int = 200000) -> float:
+def compute_auc_roc(
+    prob_map: np.ndarray,
+    gt: np.ndarray,
+    max_samples: int = 200000,
+    fov_mask: np.ndarray | None = None,
+) -> float:
     """
     Calculate Area Under ROC Curve (AUC-ROC) for pixel-level probabilities.
 
@@ -97,6 +120,8 @@ def compute_auc_roc(prob_map: np.ndarray, gt: np.ndarray, max_samples: int = 200
         Ground truth binary mask (0 or 1).
     max_samples : int, optional
         Subsample size for large images to optimize speed and avoid memory overflow.
+    fov_mask : np.ndarray or None, optional
+        Binary mask of retinal Field of View. If provided, samples are drawn inside FOV only.
 
     Returns
     -------
@@ -105,8 +130,13 @@ def compute_auc_roc(prob_map: np.ndarray, gt: np.ndarray, max_samples: int = 200
     """
     from sklearn.metrics import roc_auc_score
 
-    y_score = np.asarray(prob_map, dtype=np.float32).ravel()
-    y_true = (np.asarray(gt).ravel() > 0).astype(np.int32)
+    if fov_mask is not None:
+        fov_arr = np.asarray(fov_mask) > 0
+        y_score = np.asarray(prob_map, dtype=np.float32)[fov_arr].ravel()
+        y_true = (np.asarray(gt)[fov_arr].ravel() > 0).astype(np.int32)
+    else:
+        y_score = np.asarray(prob_map, dtype=np.float32).ravel()
+        y_true = (np.asarray(gt).ravel() > 0).astype(np.int32)
 
     # Verify ground truth contains both classes
     if len(np.unique(y_true)) < 2:

@@ -28,6 +28,7 @@ env/
 
 # Jupyter / Colab
 .ipynb_checkpoints/
+notebooks/
 
 # OS
 .DS_Store
@@ -53,7 +54,6 @@ AGENTS.md
 
 # --- Internal Plans & Local Knowledge Base ---
 IMPLEMENTATION_PLAN.md
-ROADMAP.md
 docs/
 scratch/
 *.pdf

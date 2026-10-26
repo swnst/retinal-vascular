@@ -8,8 +8,6 @@ Defines model architecture for Retinal Vessel Segmentation:
 - Output: Single-channel binary mask logits or probabilities
 """
 
-from typing import Literal
-import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
 

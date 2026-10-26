@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from dl_pipeline.postprocess import fill_holes, refine_vessel_mask, remove_small_components
 

@@ -80,19 +80,19 @@ const WORKSPACE_MODULES: WorkspaceModule[] = [
 
 // --- VERA: Vascular Extraction & Retinal Authentication Platform ---
 export default function BiometricDashboard() {
-  // Telemetry & Infrastructure State
+  // --- Telemetry & Infrastructure State ---
   const [serverStatus, setServerStatus] = useState<string>("connecting");
   const [computeDevice, setComputeDevice] = useState<string>("CHECKING...");
   const [presets, setPresets] = useState<PresetItem[]>([]);
 
-  // Decoupled Stage-Specific Preset Selections
+  // --- Stage-Specific Preset Selections ---
   const [selectedOcularPresetId, setSelectedOcularPresetId] = useState<string>("ocular_healthy_01");
   const [selectedMatchPresetId, setSelectedMatchPresetId] = useState<string>("match_genuine_01");
 
-  // Navigation: Step 1 (3D Retinal Anatomy & Vessels) | Step 2 (Biometric Identity Comparison) | Step 3 (Cohort Matrix)
+  // --- Navigation & Workflow State ---
   const [activeStage, setActiveStage] = useState<"ocular" | "matching" | "cohort">("ocular");
 
-  // Step 1: Ocular Mode State
+  // --- Stage 1: Ocular Anatomy State ---
   const [fundusA, setFundusA] = useState<string>("");
   const [segResultA, setSegResultA] = useState<SegmentationResult | null>(null);
   const [locResultA, setLocResultA] = useState<LocalizationResult | null>(null);
@@ -103,10 +103,10 @@ export default function BiometricDashboard() {
   const [showAdvancedShader, setShowAdvancedShader] = useState<boolean>(false);
   const [isProcessingA, setIsProcessingA] = useState<boolean>(false);
 
-  // 2D Quad-View Inspector State
+  // --- 2D Quad-View Inspector State ---
   const [show2DInspector, setShow2DInspector] = useState<boolean>(false);
 
-  // Step 2: Biometric Matching State (Reference A vs Target B)
+  // --- Stage 2: Biometric Matching State ---
   const [fundusB, setFundusB] = useState<string>("");
   const [labelA, setLabelA] = useState<string>("Subject 01 (Original)");
   const [labelB, setLabelB] = useState<string>("Subject 01 (Target)");
@@ -114,7 +114,7 @@ export default function BiometricDashboard() {
   const [isMatching, setIsMatching] = useState<boolean>(false);
   const [showAdvancedPerturb, setShowAdvancedPerturb] = useState<boolean>(false);
 
-  // 11-Parameter Judge-Proof Perturbation Suite
+  // --- 11-Parameter Perturbation Suite ---
   const [rotateDegB, setRotateDegB] = useState<number>(0.0);
   const [scaleFactorB, setScaleFactorB] = useState<number>(1.0);
   const [brightnessB, setBrightnessB] = useState<number>(1.0);
@@ -127,10 +127,10 @@ export default function BiometricDashboard() {
   const [sphericalWarpB, setSphericalWarpB] = useState<number>(0.0);
   const [elasticAlphaB, setElasticAlphaB] = useState<number>(0.0);
 
-  // Active stress preset chip tag
+  // --- Active Stress Preset Tag ---
   const [activeStressChip, setActiveStressChip] = useState<string>("baseline");
 
-  // Step 3: Population Cohort Matrix & Stress Benchmark State
+  // --- Stage 3: Cohort Matrix & Benchmark State ---
   const [cohortRegime, setCohortRegime] = useState<"baseline" | "torture">("baseline");
   const [isRunningCohort, setIsRunningCohort] = useState<boolean>(false);
   const [cohortProgress, setCohortProgress] = useState<{ current: number; total: number } | null>(null);
@@ -138,7 +138,7 @@ export default function BiometricDashboard() {
     Record<string, { score: number; isMatch: boolean; pairs: number; latencyMs: number }>
   >({});
 
-  // Toast / Status Message Banner
+  // --- Notification Banner State ---
   const [statusBanner, setStatusBanner] = useState<{ text: string; type: "info" | "success" | "error" } | null>(null);
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -153,7 +153,7 @@ export default function BiometricDashboard() {
     }, 5000);
   };
 
-  // Reset All 11 Perturbations to Zero/Default
+  // --- Perturbation Reset Handler ---
   const resetAllPerturbations = () => {
     setRotateDegB(0.0);
     setScaleFactorB(1.0);
@@ -168,7 +168,7 @@ export default function BiometricDashboard() {
     setElasticAlphaB(0.0);
   };
 
-  // Boot Health & Presets Fetching
+  // --- Boot Health & Presets Fetching ---
   useEffect(() => {
     fetchHealth()
       .then((h) => {
@@ -203,7 +203,7 @@ export default function BiometricDashboard() {
       .catch(() => {});
   }, []);
 
-  // Synchronize Specimen / Pair when Switching Active Stage
+  // --- Specimen Synchronization Handler ---
   const handleStageSwitch = (newStage: "ocular" | "matching" | "cohort") => {
     setActiveStage(newStage);
     if (newStage === "ocular") {
@@ -223,7 +223,7 @@ export default function BiometricDashboard() {
     }
   };
 
-  // Step 3: Cohort Subject & Benchmark Matrix Definitions
+  // --- Cohort Subject & Matrix Definitions ---
   const COHORT_SUBJECTS = [
     { id: "s01", code: "S01", name: "Subject 01", subtitle: "DRIVE 21 Normal", presetId: "match_genuine_01" },
     { id: "s02", code: "S02", name: "Subject 02", subtitle: "DRIVE 22 Impostor", presetId: "match_impostor_01" },
@@ -241,17 +241,17 @@ export default function BiometricDashboard() {
       "s01-s23": { score: 0.0, isMatch: false, pairs: 0 },
       "s01-s24": { score: 0.0, isMatch: false, pairs: 0 },
       "s02-s01": { score: 0.0, isMatch: false, pairs: 0 },
-      "s02-s02": { score: 1.0, isMatch: true, pairs: 108 },
+      "s02-s02": { score: 1.0, isMatch: true, pairs: 129 },
       "s02-s23": { score: 0.0, isMatch: false, pairs: 0 },
       "s02-s24": { score: 0.0, isMatch: false, pairs: 0 },
       "s23-s01": { score: 0.0, isMatch: false, pairs: 0 },
       "s23-s02": { score: 0.0, isMatch: false, pairs: 0 },
-      "s23-s23": { score: 1.0, isMatch: true, pairs: 50 },
+      "s23-s23": { score: 1.0, isMatch: true, pairs: 58 },
       "s23-s24": { score: 0.0, isMatch: false, pairs: 0 },
       "s24-s01": { score: 0.0, isMatch: false, pairs: 0 },
       "s24-s02": { score: 0.0, isMatch: false, pairs: 0 },
       "s24-s23": { score: 0.0, isMatch: false, pairs: 0 },
-      "s24-s24": { score: 1.0, isMatch: true, pairs: 124 },
+      "s24-s24": { score: 1.0, isMatch: true, pairs: 142 },
     },
     torture: {
       "s01-s01": { score: 0.634, isMatch: true, pairs: 51 },
@@ -259,7 +259,7 @@ export default function BiometricDashboard() {
       "s01-s23": { score: 0.0, isMatch: false, pairs: 0 },
       "s01-s24": { score: 0.0, isMatch: false, pairs: 0 },
       "s02-s01": { score: 0.0, isMatch: false, pairs: 0 },
-      "s02-s02": { score: 0.589, isMatch: true, pairs: 47 },
+      "s02-s02": { score: 0.452, isMatch: true, pairs: 37 },
       "s02-s23": { score: 0.0, isMatch: false, pairs: 0 },
       "s02-s24": { score: 0.0, isMatch: false, pairs: 0 },
       "s23-s01": { score: 0.0, isMatch: false, pairs: 0 },
@@ -284,7 +284,7 @@ export default function BiometricDashboard() {
     { key: "torture", label: "Judge Torture Multi-Factor (All 7)", score: 0.634, isMatch: true, desc: "Worst-Case Multi-Vector Stress" },
   ];
 
-  // Helper: Get Normalized Subject Data for Stage 03 Cohort Evaluation
+  // --- Normalized Cohort Subject Retrieval ---
   const getCohortSubjectData = (subjId: string): { image: string; label: string } => {
     switch (subjId) {
       case "s01": {
@@ -320,7 +320,7 @@ export default function BiometricDashboard() {
     }
   };
 
-  // Step 3: Handle One-Click Drill-Down into Stage 02
+  // --- Cohort Cell Drill-Down Handler ---
   const handleDrillDownFromCohort = (subjAId: string, subjBId: string) => {
     const dataA = getCohortSubjectData(subjAId);
     const dataB = getCohortSubjectData(subjBId);
@@ -348,11 +348,11 @@ export default function BiometricDashboard() {
     );
   };
 
-  // Step 3: Execute Live Cohort Cross-Evaluation
+  // --- Live Cohort Cross-Evaluation ---
   const handleRunLiveCohort = async () => {
     setIsRunningCohort(true);
     showToast(`Evaluating Cohort Cross-Matching under ${cohortRegime.toUpperCase()} regime...`, "info");
-    // 4 diagonal genuine pairs + 6 unique off-diagonal impostor pairs
+    // --- Pair Evaluation Execution ---
     const pairs: Array<{ aId: string; bId: string }> = [
       { aId: "s01", bId: "s01" },
       { aId: "s02", bId: "s02" },
@@ -418,7 +418,7 @@ export default function BiometricDashboard() {
     showToast(`Live Cohort verification completed across all 16 matrix cells!`, "success");
   };
 
-  // Step 1: Handle Ocular Specimen Preset Selection
+  // --- Stage 1: Specimen Preset Selection ---
   const handleSelectOcularPreset = (preset: PresetItem) => {
     setSelectedOcularPresetId(preset.id);
     setFundusA(preset.image_base64);
@@ -428,7 +428,7 @@ export default function BiometricDashboard() {
     showToast(`Loaded anatomical specimen: ${preset.title}`, "info");
   };
 
-  // Step 2: Handle Biometric Scenario Preset Selection
+  // --- Stage 2: Scenario Preset Selection ---
   const handleSelectMatchPreset = (preset: PresetItem) => {
     setSelectedMatchPresetId(preset.id);
     setFundusA(preset.image_base64);
@@ -457,7 +457,7 @@ export default function BiometricDashboard() {
     showToast(`Loaded biometric pair: ${preset.title}`, "info");
   };
 
-  // 8 One-Click Judge Stress-Test Presets
+  // --- Clinical Stress Presets ---
   const applyJudgeStressPreset = (key: string) => {
     setActiveStressChip(key);
     setMatchResult(null);
@@ -517,7 +517,7 @@ export default function BiometricDashboard() {
     }
   };
 
-  // Handle Custom Image Upload
+  // --- Custom Image Upload Handler ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: "A" | "B") => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -540,7 +540,7 @@ export default function BiometricDashboard() {
     reader.readAsDataURL(file);
   };
 
-  // Run AI Pipeline: Vessel Segmentation & Anatomical Localization
+  // --- AI Pipeline Execution ---
   const handleExecuteInference = async () => {
     if (!fundusA) return;
     setIsProcessingA(true);
@@ -563,7 +563,7 @@ export default function BiometricDashboard() {
     }
   };
 
-  // Run Biometric 1-to-1 Hungarian Matching with Full 11-Parameter Suite
+  // --- Biometric Matching Execution ---
   const handleExecuteVerification = async () => {
     if (!fundusA || !fundusB) return;
     setIsMatching(true);

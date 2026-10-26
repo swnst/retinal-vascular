@@ -1,6 +1,5 @@
 import csv
 import math
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -118,14 +117,14 @@ def evaluate_localization(
         else:
             vessel_mask = np.zeros_like(green_channel, dtype=np.uint8)
 
-        # 1. Optic Disc Localization
+        # --- Optic Disc Localization ---
         pred_od_xy = find_optic_disk(vessel_mask, green_channel)
         od_err = (
             localization_distance(pred_od_xy, gt_od) if gt_od is not None else float("nan")
         )
         od_norm_err = (od_err / w) if not math.isnan(od_err) else float("nan")
 
-        # 2. Fovea Localization
+        # --- Fovea Localization ---
         pred_fovea_xy = find_fovea(vessel_mask, pred_od_xy, green_channel)
         fovea_err = (
             localization_distance(pred_fovea_xy, gt_fovea)
@@ -203,7 +202,7 @@ def evaluate_localization(
         "fovea_success_rate_5pct": float(np.mean([e <= 0.05 for e in fov_norm])) if fov_norm else 0.0,
     }
 
-    # Generate Visualization for a subset of samples
+    # --- Landmark Visualization Generation ---
     import matplotlib.pyplot as plt
 
     vis_dir = output_dir / "visualizations"
@@ -223,12 +222,10 @@ def evaluate_localization(
         plt.figure(figsize=(10, 7))
         plt.imshow(rgb)
 
-        # Plot OD: Ground Truth (Green circle), Prediction (Red cross)
         if r["gt_od_x"] and r["gt_od_y"]:
             plt.plot(r["gt_od_x"], r["gt_od_y"], "go", markersize=12, label="GT Optic Disc")
         plt.plot(r["pred_od_x"], r["pred_od_y"], "rx", markersize=14, markeredgewidth=3, label="Pred Optic Disc")
 
-        # Plot Fovea: Ground Truth (Cyan circle), Prediction (Yellow cross)
         if r["gt_fovea_x"] and r["gt_fovea_y"]:
             plt.plot(r["gt_fovea_x"], r["gt_fovea_y"], "co", markersize=12, label="GT Fovea")
         plt.plot(r["pred_fovea_x"], r["pred_fovea_y"], "yx", markersize=14, markeredgewidth=3, label="Pred Fovea")

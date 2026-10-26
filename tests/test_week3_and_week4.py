@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 import torch
 
-from dl_pipeline.model import get_model, count_parameters, create_unet_resnet34
-from dl_pipeline.train import CombinedLoss, DiceLoss, EarlyStopping, compute_batch_dice
+from dl_pipeline.model import get_model, count_parameters
+from dl_pipeline.train import CombinedLoss, EarlyStopping
 from dl_pipeline.predict import predict_vessel_mask
 from evaluation.metrics import pixel_metrics, compute_auc_roc
 
@@ -26,7 +26,7 @@ def test_model_instantiation_and_parameters():
     param_info = count_parameters(model)
     assert "total_params" in param_info
     assert "trainable_params" in param_info
-    assert param_info["total_params"] > 20_000_000  # ResNet-34 U-Net has ~24.4M params
+    assert param_info["total_params"] > 20_000_000
     assert param_info["trainable_params"] == param_info["total_params"]
 
 
@@ -51,7 +51,7 @@ def test_dice_loss_and_combined_loss():
     targets = torch.randint(0, 2, (2, 1, 64, 64)).float()
 
     loss = criterion(logits, targets)
-    assert loss.dim() == 0  # scalar
+    assert loss.dim() == 0
     assert not torch.isnan(loss)
     assert loss.item() >= 0.0
 
@@ -63,10 +63,10 @@ def test_early_stopping():
     """Verify EarlyStopping for both max and min optimization modes."""
     es = EarlyStopping(patience=3, mode="max")
     assert not es(0.5)
-    assert not es(0.6)  # Improved
-    assert not es(0.55) # Degraded (patience count=1)
-    assert not es(0.54) # Degraded (patience count=2)
-    assert es(0.50)     # Degraded (patience count=3 -> Early stop triggered)
+    assert not es(0.6)
+    assert not es(0.55)
+    assert not es(0.54)
+    assert es(0.50)
 
 
 def test_predict_vessel_mask_and_resize_restoration():
@@ -77,7 +77,6 @@ def test_predict_vessel_mask_and_resize_restoration():
     orig_h, orig_w = 600, 800
     dummy_img = np.random.randint(0, 256, (orig_h, orig_w, 3), dtype=np.uint8)
 
-    # Standard inference
     bin_mask, prob_map = predict_vessel_mask(
         model=model,
         image=dummy_img,
@@ -92,7 +91,6 @@ def test_predict_vessel_mask_and_resize_restoration():
     assert set(np.unique(bin_mask)).issubset({0, 1})
     assert 0.0 <= prob_map.min() and prob_map.max() <= 1.0
 
-    # TTA enabled inference
     bin_mask_tta, prob_map_tta = predict_vessel_mask(
         model=model,
         image=dummy_img,
@@ -111,8 +109,8 @@ def test_evaluation_metrics():
     gt[40:60, 40:60] = 1
 
     pred = np.zeros((100, 100), dtype=np.float32)
-    pred[40:60, 40:60] = 0.9  # TP 400
-    pred[0:10, 0:10] = 0.8    # FP 100
+    pred[40:60, 40:60] = 0.9
+    pred[0:10, 0:10] = 0.8
 
     metrics = pixel_metrics(pred, gt, threshold=0.5)
     assert "accuracy" in metrics
@@ -121,7 +119,6 @@ def test_evaluation_metrics():
     assert "f1" in metrics
     assert "dice" in metrics
 
-    # TP = 400, FN = 0 -> Sensitivity = 1.0
     assert pytest.approx(metrics["sensitivity"], 1e-4) == 1.0
     assert metrics["specificity"] < 1.0
 

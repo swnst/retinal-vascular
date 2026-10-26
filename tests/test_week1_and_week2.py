@@ -10,11 +10,8 @@ import torch
 from classical_pipeline.localization import find_optic_disk, find_fovea
 from evaluation.metrics import pixel_metrics, localization_distance
 from dl_pipeline.data_utils import (
-    list_drive_samples,
-    list_stare_samples,
-    list_hrf_samples,
-    discover_dataset_samples,
     create_synthetic_drive_sample,
+    discover_dataset_samples,
 )
 from dl_pipeline.dataset import RetinalVesselDataset, split_samples
 
@@ -103,6 +100,23 @@ class TestWeek2DatasetAndUtils(unittest.TestCase):
             self.assertGreaterEqual(float(sample["image"].min()), 0.0)
             self.assertLessEqual(float(sample["image"].max()), 1.0)
             self.assertTrue((sample["mask"] == 0).logical_or(sample["mask"] == 1).all())
+
+    def test_discover_dataset_samples_drive_scoping(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            drive_dir = tmp_path / "DRIVE"
+            create_synthetic_drive_sample(drive_dir)
+
+            other_dir = tmp_path / "OTHER" / "images"
+            other_dir.mkdir(parents=True, exist_ok=True)
+            (other_dir / "other_01.tif").write_bytes(b"dummy")
+
+            discovered = discover_dataset_samples(tmp_path, dataset_name="DRIVE")
+            self.assertGreater(len(discovered), 0)
+            for img_p, mask_p in discovered:
+                self.assertTrue(Path(img_p).is_relative_to(drive_dir))
+
 
 
 if __name__ == "__main__":

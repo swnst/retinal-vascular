@@ -1,1 +1,1 @@
-# Deep Learning pipeline package
+# --- Deep Learning Perception Subsystem ---

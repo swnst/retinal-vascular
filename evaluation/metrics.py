@@ -6,7 +6,6 @@ Performance evaluation metrics module:
 2. localization_distance: Euclidean distance for evaluating Optic Disc and Fovea landmarks against Ground Truth.
 """
 
-from typing import Any
 import numpy as np
 
 
@@ -54,7 +53,6 @@ def pixel_metrics(
             f"Shape mismatch: pred shape {pred_arr.shape} does not match gt shape {gt_arr.shape}"
         )
 
-    # Binarize pred and gt
     if pred_arr.dtype == bool:
         pred_bin = pred_arr
     elif np.issubdtype(pred_arr.dtype, np.floating):
@@ -90,7 +88,6 @@ def pixel_metrics(
     negatives = tn + fp
     specificity = tn / negatives if negatives > 0 else 0.0
 
-    # Dice / F1 = 2*TP / (2*TP + FP + FN)
     f1_denominator = (2 * tp) + fp + fn
     f1 = (2.0 * tp) / f1_denominator if f1_denominator > 0 else 0.0
 
@@ -138,7 +135,6 @@ def compute_auc_roc(
         y_score = np.asarray(prob_map, dtype=np.float32).ravel()
         y_true = (np.asarray(gt).ravel() > 0).astype(np.int32)
 
-    # Verify ground truth contains both classes
     if len(np.unique(y_true)) < 2:
         return 1.0
 

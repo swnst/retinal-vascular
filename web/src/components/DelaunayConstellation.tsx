@@ -38,7 +38,7 @@ export default function DelaunayConstellation({
   const planeBMeshRef = useRef<THREE.Mesh | null>(null);
   const matBRef = useRef<THREE.ShaderMaterial | null>(null);
 
-  // 3D Viewport Controls
+  // --- 3D Viewport Controls ---
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
   const [rotationMode, setRotationMode] = useState<"sway" | "turntable">("sway");
   const [zoomLevel, setZoomLevel] = useState<number>(5.2);
@@ -71,7 +71,7 @@ export default function DelaunayConstellation({
     setZoomLevel((prev) => Math.min(8.0, Math.max(3.0, prev + delta)));
   };
 
-  // Live 3D Perturbation on Target Plane B
+  // --- Target Plane B Perturbations ---
   useEffect(() => {
     if (planeBGroupRef.current) {
       if (perturbedFundusBBase64) {
@@ -114,7 +114,7 @@ export default function DelaunayConstellation({
     scene.add(mainGroup);
     mainGroupRef.current = mainGroup;
 
-    // Helper: Circular Retinal Disc Material with Brightness modulation
+    // --- Circular Retinal Disc Material ---
     const createRetinalMaterial = (tintColor: THREE.Color, initialBrightness: number = 1.0) => {
       return new THREE.ShaderMaterial({
         uniforms: {
@@ -147,7 +147,7 @@ export default function DelaunayConstellation({
               baseColor = texture2D(tFundus, vUv).rgb * uBrightness;
             }
 
-            // Subtle rim aura in tint color
+            // --- Subtle Rim Aura ---
             float rim = smoothstep(0.85, 0.96, r);
             baseColor = mix(baseColor, uTint, rim * 0.45);
 
@@ -162,7 +162,7 @@ export default function DelaunayConstellation({
 
     const planeGeo = new THREE.PlaneGeometry(2.7, 2.7);
 
-    // Plane A (Left, Cyan Tint)
+    // --- Plane A Setup ---
     const matA = createRetinalMaterial(new THREE.Color(0x06b6d4));
     const meshA = new THREE.Mesh(planeGeo, matA);
     meshA.position.set(-1.65, 0, -0.04);
@@ -178,7 +178,7 @@ export default function DelaunayConstellation({
       });
     }
 
-    // Plane B Group (Right, Rose Tint)
+    // --- Plane B Setup ---
     const planeBGroup = new THREE.Group();
     planeBGroup.position.set(1.65, 0, 0);
     mainGroup.add(planeBGroup);
@@ -210,7 +210,7 @@ export default function DelaunayConstellation({
       planeBGroup.scale.set(scaleFactorB, scaleFactorB, 1.0);
     }
 
-    // Coordinate conversion function from 2D pixels to 3D Plane coordinates
+    // --- Coordinate Conversion ---
     const mapPixelTo3D = (px: number, py: number, widthImg: number, heightImg: number, xCenterOffset: number) => {
       const u = px / Math.max(1, widthImg);
       const v = py / Math.max(1, heightImg);
@@ -219,7 +219,7 @@ export default function DelaunayConstellation({
       return new THREE.Vector3(x, y, 0.0);
     };
 
-    // Helper: Build Delaunay Network
+    // --- Delaunay Network Construction ---
     const buildDelaunayNetwork = (
       template: TemplateSummary,
       xOffset: number,
@@ -231,7 +231,7 @@ export default function DelaunayConstellation({
       const wImg = template.width || 565;
       const hImg = template.height || 584;
 
-      // 1. Nodes
+      // --- Minutiae Keypoint Nodes ---
       const ptGeo = new THREE.BufferGeometry();
       const ptPos: number[] = [];
       template.keypoints.forEach((pt) => {
@@ -247,7 +247,7 @@ export default function DelaunayConstellation({
       });
       group.add(new THREE.Points(ptGeo, ptMat));
 
-      // 2. Delaunay Wireframe
+      // --- Delaunay Wireframe ---
       const standardLines: number[] = [];
       const matchedLines: number[] = [];
 
@@ -261,7 +261,7 @@ export default function DelaunayConstellation({
         standardLines.push(v2.x, v2.y, v2.z + 0.02, v0.x, v0.y, v0.z + 0.02);
       });
 
-      // 3. Highlighted Matched Triangles (both seed and induced common-subgraph)
+      // --- Highlighted Matched Triangles ---
       matchedTrianglesVerts.forEach((verts) => {
         if (verts && verts.length >= 3) {
           const v0 = mapPixelTo3D(verts[0][0], verts[0][1], wImg, hImg, xOffset);
@@ -313,7 +313,7 @@ export default function DelaunayConstellation({
       mainGroup.add(meshNetB);
     }
 
-    // 4. Hungarian Laser Correspondence Beams
+    // --- Laser Correspondence Beams ---
     if (matchedPairs.length > 0 && templateA && templateB) {
       const wA = templateA.width || 565;
       const hA = templateA.height || 584;
@@ -338,7 +338,7 @@ export default function DelaunayConstellation({
       });
     }
 
-    // Drag Orbit & Wheel Zoom
+    // --- Drag Orbit & Wheel Zoom ---
     let isDragging = false;
     let prevMouse = { x: 0, y: 0 };
     let velocity = { x: 0, y: 0 };
@@ -375,7 +375,7 @@ export default function DelaunayConstellation({
     window.addEventListener("mouseup", onMouseUp);
     domElement.addEventListener("wheel", onWheel, { passive: false });
 
-    // ResizeObserver
+    // --- Viewport Resize Observer ---
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width: w, height: h } = entry.contentRect;

@@ -83,11 +83,11 @@ class PipelineService:
         out = img_bgr.astype(np.float32)
         fov = estimate_fov_mask(img_bgr) > 0
 
-        # 1. Gamma Tone-Curve Adjustment
+        # --- Gamma Tone-Curve Adjustment ---
         if abs(gamma - 1.0) > 1e-3:
             out = np.power(np.clip(out / 255.0, 0.0, 1.0), gamma) * 255.0
 
-        # 2. Cataract / Media Opacity Haze
+        # --- Cataract & Media Opacity Haze ---
         if haze_factor > 1e-3:
             veil = np.zeros_like(out)
             veil[:, :, 0] = 125.0
@@ -97,7 +97,7 @@ class PipelineService:
             haze_layer = 0.65 * veil + 0.35 * blurred_bg
             out = (1.0 - haze_factor) * out + haze_factor * haze_layer
 
-        # 3. Corneal Specular Flash Glare
+        # --- Corneal Specular Flash Glare ---
         if glare_intensity > 1e-3:
             y_grid, x_grid = np.indices((h, w), dtype=np.float32)
             gx, gy = w * 0.45, h * 0.42
@@ -106,23 +106,23 @@ class PipelineService:
             glare_bgr = np.stack([spot * 220.0, spot * 240.0, spot * 255.0], axis=-1)
             out = out + glare_intensity * glare_bgr
 
-        # 4. Defocus / Accommodation Blur
+        # --- Defocus & Accommodation Blur ---
         if blur_sigma > 1e-3:
             ksize = int(2 * round(3 * blur_sigma) + 1)
             ksize = max(3, ksize if ksize % 2 == 1 else ksize + 1)
             out = cv2.GaussianBlur(out, (ksize, ksize), sigmaX=blur_sigma, sigmaY=blur_sigma)
 
-        # 5. CMOS Sensor Thermal/ISO Noise
+        # --- CMOS Sensor ISO Noise ---
         if noise_sigma > 1e-3:
             rng = np.random.default_rng(42)
             gaussian_noise = rng.normal(0.0, noise_sigma, size=out.shape).astype(np.float32)
             out = out + gaussian_noise
 
-        # 6. Flash Illumination / Brightness
+        # --- Flash Illumination & Brightness ---
         if abs(brightness - 1.0) > 1e-3:
             out = out * brightness
 
-        # 7. Eyelid Closure / Eyelash Shadow Occlusion
+        # --- Eyelid Occlusion ---
         if occlusion_frac > 1e-3:
             ys, _ = np.where(fov)
             if len(ys) > 0:
@@ -132,11 +132,11 @@ class PipelineService:
                 out[:cut_top, :] = 0
                 out[cut_bot:, :] = 0
 
-        # Mask outside clean FOV before geometric warps
+        # --- FOV Aperture Masking ---
         out = np.clip(out, 0.0, 255.0).astype(np.uint8)
         out[~fov] = 0
 
-        # 8. Spherical Radial Distortion
+        # --- Spherical Radial Distortion ---
         if abs(spherical_warp) > 1e-3:
             cx, cy = w / 2.0, h / 2.0
             r_max = math.hypot(cx, cy)
@@ -150,7 +150,7 @@ class PipelineService:
             map_y = (cy + dy * distortion_factor).astype(np.float32)
             out = cv2.remap(out, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
 
-        # 9. Elastic Displacement Field (Pulsatile IOP / Micro-saccades)
+        # --- Elastic Displacement Field ---
         if elastic_alpha > 1e-3:
             rng = np.random.default_rng(42)
             rand_dx = rng.uniform(-1.0, 1.0, size=(h, w)).astype(np.float32)
@@ -166,7 +166,7 @@ class PipelineService:
             map_y = (y_grid + smooth_dy).astype(np.float32)
             out = cv2.remap(out, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
 
-        # 10 & 11. Rigid Affine Rotation and Scaling
+        # --- Rigid Affine Rotation and Scaling ---
         if abs(rotate_deg) > 1e-3 or abs(scale_factor - 1.0) > 1e-3:
             center = (w / 2.0, h / 2.0)
             M = cv2.getRotationMatrix2D(center, rotate_deg, scale_factor)
@@ -187,7 +187,7 @@ class PipelineService:
         t0 = time.perf_counter()
         rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
 
-        # Adaptive high-frequency sensor noise pre-conditioning (Donoho-Johnstone MAD estimator)
+        # --- Adaptive Sensor Noise Pre-Conditioning ---
         green = rgb_image[:, :, 1].astype(np.float32)
         fov_raw = estimate_fov_mask(bgr_image) > 0
         if np.any(fov_raw):
@@ -209,7 +209,7 @@ class PipelineService:
             use_tta=use_tta,
         )
 
-        # Quantile-Calibrated Adaptive Probability Thresholding
+        # --- Quantile-Calibrated Adaptive Probability Thresholding ---
         if np.any(fov_raw) and abs(threshold - 0.60) < 1e-3:
             p95 = float(np.percentile(prob_map[fov_raw], 95.0))
             if p95 < 0.85:
@@ -221,7 +221,7 @@ class PipelineService:
                 binary_mask, min_size=min_size, max_hole_size=max_hole_size
             )
 
-        # FOV masking & suppression of circular edge artifacts
+        # --- FOV Edge Artifact Suppression ---
         fov_mask = estimate_fov_mask(bgr_image) > 0
         fov_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         fov_eroded = cv2.erode(fov_mask.astype(np.uint8), fov_kernel) > 0
@@ -231,11 +231,11 @@ class PipelineService:
 
         keypoints_list: list[dict[str, float]] = []
         if compute_skeleton:
-            from skimage.morphology import skeletonize
+            from matching.skeleton import skeletonize_zhang_suen
             from classical_pipeline.skeleton_metrics import prune_short_spurs
             from matching.bifurcation import detect_bifurcations
 
-            skel = skeletonize(binary_mask > 0)
+            skel = skeletonize_zhang_suen(binary_mask) > 0
             skel = prune_short_spurs(skel, threshold=8) & fov_eroded
             bif_pts = detect_bifurcations(skel)
             keypoints_list = [{"x": float(p[0]), "y": float(p[1])} for p in bif_pts]
@@ -362,7 +362,7 @@ class PipelineService:
     ) -> dict[str, Any]:
         t0 = time.perf_counter()
 
-        # Apply 11-parameter perturbation suite to Image B if any parameter is active
+        # --- Image Perturbation Application ---
         has_perturbation = (
             abs(rotate_deg_b) > 1e-3
             or abs(scale_factor_b - 1.0) > 1e-3

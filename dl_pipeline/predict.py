@@ -9,7 +9,6 @@ Helper functions for retinal vessel segmentation inference:
 """
 
 from pathlib import Path
-from typing import Literal
 import cv2
 import numpy as np
 from PIL import Image

@@ -4,7 +4,7 @@ import numpy as np
 
 try:
     from .localization_api import find_fovea, find_optic_disk
-except ImportError:  # Direct script execution from classical_pipeline/.
+except ImportError:
     from localization_api import find_fovea, find_optic_disk
 
 

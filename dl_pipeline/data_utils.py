@@ -5,13 +5,43 @@ Helper functions to discover and pair retinal fundus images and ground-truth ves
 for DRIVE, STARE, and HRF datasets.
 """
 
-import os
+import gzip
+import io
 import re
 from pathlib import Path
 from typing import Literal
+import numpy as np
 from PIL import Image, ImageDraw
 
 DatasetName = Literal["DRIVE", "STARE", "HRF"]
+
+
+def load_rgb_image(path: str | Path) -> np.ndarray:
+    p = Path(path)
+    if str(p).endswith(".gz"):
+        with gzip.open(p, "rb") as gz_file:
+            with Image.open(io.BytesIO(gz_file.read())) as img_pil:
+                return np.array(img_pil.convert("RGB"))
+    else:
+        with Image.open(p) as img_pil:
+            return np.array(img_pil.convert("RGB"))
+
+
+def load_binary_gt_mask(path: str | Path, target_shape: tuple[int, int] | None = None) -> np.ndarray:
+    p = Path(path)
+    if str(p).endswith(".gz"):
+        with gzip.open(p, "rb") as gz_file:
+            with Image.open(io.BytesIO(gz_file.read())) as mask_pil:
+                mask = np.array(mask_pil.convert("L"))
+    else:
+        with Image.open(p) as mask_pil:
+            mask = np.array(mask_pil.convert("L"))
+
+    if target_shape is not None and mask.shape[:2] != target_shape:
+        mask_resized = Image.fromarray(mask).resize((target_shape[1], target_shape[0]), Image.NEAREST)
+        mask = np.array(mask_resized)
+
+    return (mask > 127).astype(np.uint8)
 
 
 def list_drive_samples(root_dir: str | Path) -> list[tuple[str, str]]:
@@ -77,7 +107,7 @@ def list_drive_samples(root_dir: str | Path) -> list[tuple[str, str]]:
                             mask_candidates.append(m_file)
 
         if not mask_candidates:
-            # Fallback search strictly for manual vessel annotations, excluding circular FOV masks
+            # --- Fallback Annotation Search ---
             for m_file in root.rglob("*"):
                 if m_file.is_file():
                     parts = [part.lower() for part in m_file.parts]
@@ -115,7 +145,7 @@ def list_stare_samples(root_dir: str | Path) -> list[tuple[str, str]]:
                         if ".vk." not in name and ".ah." not in name:
                             img_files.append(p)
 
-    # Index all potential mask files once into a dict
+    # --- Mask File Indexing ---
     mask_lookup: dict[str, list[Path]] = {}
     for m_file in root.rglob("*"):
         if m_file.is_file():
@@ -184,11 +214,14 @@ def discover_dataset_samples(
     name = dataset_name.upper() if dataset_name else root.name.upper()
 
     if "DRIVE" in name:
-        return list_drive_samples(root)
+        sub_root = root / "DRIVE" if (root / "DRIVE").is_dir() else root
+        return list_drive_samples(sub_root)
     elif "STARE" in name:
-        return list_stare_samples(root)
+        sub_root = root / "STARE" if (root / "STARE").is_dir() else root
+        return list_stare_samples(sub_root)
     elif "HRF" in name:
-        return list_hrf_samples(root)
+        sub_root = root / "HRF" if (root / "HRF").is_dir() else root
+        return list_hrf_samples(sub_root)
     else:
         combined: list[tuple[str, str]] = []
         for sub_name, func in [("DRIVE", list_drive_samples), ("HRF", list_hrf_samples), ("STARE", list_stare_samples)]:

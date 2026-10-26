@@ -12,7 +12,7 @@ import gzip
 import io
 import math
 from pathlib import Path
-from typing import Callable, Literal, Sequence
+from typing import Literal, Sequence
 import numpy as np
 from PIL import Image
 import torch

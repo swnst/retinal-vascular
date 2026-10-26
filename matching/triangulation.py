@@ -4,9 +4,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 
 
-# --- Delaunay Triangulation & Invariant Feature Extraction ---
 def triangle_area(p1: tuple[float, float], p2: tuple[float, float], p3: tuple[float, float]) -> float:
-    # 0.5 * |x1(y2 - y3) + x2(y3 - y1) + x3(y1 - y2)|
     x1, y1 = p1
     x2, y2 = p2
     x3, y3 = p3
@@ -21,7 +19,6 @@ def build_delaunay_triangulation(
 
     pts_array = np.array(points, dtype=np.float64)
 
-    # Check for collinearity or near-zero variance
     if np.var(pts_array[:, 0]) < 1e-4 or np.var(pts_array[:, 1]) < 1e-4:
         return None, np.array([])
 
@@ -35,7 +32,6 @@ def build_delaunay_triangulation(
 def triangle_internal_angles(
     p1: tuple[float, float], p2: tuple[float, float], p3: tuple[float, float]
 ) -> list[float]:
-    # Compute 3 internal angles in radians, sorted
     a = math.hypot(p2[0] - p3[0], p2[1] - p3[1])
     b = math.hypot(p1[0] - p3[0], p1[1] - p3[1])
     c = math.hypot(p1[0] - p2[0], p1[1] - p2[1])

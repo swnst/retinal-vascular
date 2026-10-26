@@ -2,29 +2,24 @@
 Training Pipeline Module
 
 Training pipeline for Retinal Vessel Segmentation:
-- Combined Loss: Binary Cross Entropy (BCE) + Dice Loss
+- Tripartite Loss: Binary Cross Entropy (BCE) + Soft Dice + Soft-clDice
 - Optimizer: Adam
 - Training loop with validation evaluation
 - Checkpointing and best model serialization
 - Cross-platform support (Local / Google Colab / Kaggle)
 """
 
-import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import torch.nn as nn
-from torch.optim import Adam, Optimizer
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR, _LRScheduler
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 import torch.nn.functional as F
 
-from dl_pipeline.model import get_model
-from dl_pipeline.dataset import RetinalVesselDataset
-from dl_pipeline.data_utils import discover_dataset_samples
 
 
 # --- Differentiable Morphological Skeletonization & Soft-clDice Loss ---

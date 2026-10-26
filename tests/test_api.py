@@ -1,4 +1,3 @@
-import base64
 import cv2
 import numpy as np
 import pytest
@@ -16,13 +15,9 @@ def client():
 
 def create_dummy_fundus_base64(w: int = 250, h: int = 250) -> str:
     img = np.zeros((h, w, 3), dtype=np.uint8)
-    # Circular orange-red fundus disk
     cv2.circle(img, (w // 2, h // 2), int(w * 0.42), (20, 50, 180), -1)
-    # Bright spot for Optic Disc
     cv2.circle(img, (int(w * 0.35), int(h * 0.5)), int(w * 0.08), (140, 210, 240), -1)
-    # Dark spot for Fovea
     cv2.circle(img, (int(w * 0.65), int(h * 0.5)), int(w * 0.05), (10, 25, 90), -1)
-    # Vessel strokes
     cv2.line(img, (int(w * 0.35), int(h * 0.5)), (int(w * 0.5), int(h * 0.2)), (80, 120, 240), 2)
     cv2.line(img, (int(w * 0.35), int(h * 0.5)), (int(w * 0.5), int(h * 0.8)), (80, 120, 240), 2)
     return pipeline_service.encode_base64_image(img, ".png")

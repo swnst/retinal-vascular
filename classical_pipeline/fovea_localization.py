@@ -12,7 +12,7 @@ try:
         select_center_from_score,
         upsample_map,
     )
-except ImportError:  # Direct script execution from classical_pipeline/.
+except ImportError:
     from optic_disc_localization import (
         ensure_center_inside_fov,
         normalize_inside_fov,

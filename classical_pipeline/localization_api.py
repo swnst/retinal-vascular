@@ -19,7 +19,7 @@ try:
         OpticDiscConfig,
         detect_optic_disc_center,
     )
-except ImportError:  # Direct script execution from classical_pipeline/.
+except ImportError:
     from fovea_localization import (
         FoveaConfig,
         detect_fovea_center,
@@ -114,7 +114,7 @@ def _normalize_image_input(
         if float(channels.max()) <= 1.0:
             channels *= 255.0
         uint8_3d = np.rint(channels).clip(0, 255).astype(np.uint8)
-        # If input is RGB, convert to BGR for classical localization pipeline
+        # --- Color Space Normalization ---
         if color_order.upper() == "RGB":
             return cv2.cvtColor(uint8_3d, cv2.COLOR_RGB2BGR)
         return uint8_3d

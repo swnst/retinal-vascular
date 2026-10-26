@@ -44,7 +44,7 @@ export default function RetinalGlobe({
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const skelMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
 
-  // 3D Viewport Navigation State
+  // --- 3D Viewport Navigation State ---
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
   const [rotationMode, setRotationMode] = useState<"sway" | "turntable">("sway");
   const [zoomLevel, setZoomLevel] = useState<number>(4.4);
@@ -88,7 +88,7 @@ export default function RetinalGlobe({
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
 
-    // 1. Scene & Camera Setup
+    // --- Scene & Camera Setup ---
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
     camera.position.set(0, 0, zoomLevelRef.current);
@@ -105,7 +105,7 @@ export default function RetinalGlobe({
     scene.add(ocularGroup);
     ocularGroupRef.current = ocularGroup;
 
-    // 2. Anatomical Concave Paraboloid Mesh
+    // --- Anatomical Concave Paraboloid Mesh ---
     const gridRes = 160;
     const planeGeo = new THREE.PlaneGeometry(3.2, 3.2, gridRes, gridRes);
     const posAttr = planeGeo.attributes.position;
@@ -122,7 +122,7 @@ export default function RetinalGlobe({
     }
     planeGeo.computeVertexNormals();
 
-    // 3. Custom GLSL Shader for Continuous 60FPS Probability Thresholding & Subsurface Glow
+    // --- Custom GLSL Thresholding & Glow Shader ---
     const customMaterial = new THREE.ShaderMaterial({
       uniforms: {
         tFundus: { value: null },
@@ -214,7 +214,7 @@ export default function RetinalGlobe({
     ocularGroup.add(dishMesh);
     dishMeshRef.current = dishMesh;
 
-    // 4. Pure Glowing 3D Skeleton Shader (Zero Black Background Occlusion)
+    // --- Glowing 3D Skeleton Shader ---
     const skelMaterial = new THREE.ShaderMaterial({
       uniforms: {
         tSkeleton: { value: null },
@@ -259,12 +259,12 @@ export default function RetinalGlobe({
     ocularGroup.add(skelMesh);
     skeletonMeshRef.current = skelMesh;
 
-    // 5. 3D Landmark Beacon Group
+    // --- 3D Landmark Beacon Group ---
     const beaconGroup = new THREE.Group();
     ocularGroup.add(beaconGroup);
     beaconGroupRef.current = beaconGroup;
 
-    // 6. Interactive Orbital Drag & Wheel Zoom
+    // --- Interactive Orbital Drag & Wheel Zoom ---
     let isDragging = false;
     let prevMouse = { x: 0, y: 0 };
     let velocity = { x: 0, y: 0 };
@@ -301,7 +301,7 @@ export default function RetinalGlobe({
     window.addEventListener("mouseup", onMouseUp);
     domElement.addEventListener("wheel", onWheel, { passive: false });
 
-    // 7. ResizeObserver
+    // --- Viewport Resize Observer ---
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width: w, height: h } = entry.contentRect;
@@ -314,7 +314,7 @@ export default function RetinalGlobe({
     });
     resizeObserver.observe(container);
 
-    // 8. Controlled 60FPS Render Loop
+    // --- Controlled 60FPS Render Loop ---
     let animId: number;
     const clock = new THREE.Clock();
 
@@ -383,7 +383,7 @@ export default function RetinalGlobe({
     };
   }, []);
 
-  // Update Textures
+  // --- Texture Uniform Updates ---
   useEffect(() => {
     if (!materialRef.current) return;
     const loader = new THREE.TextureLoader();
@@ -443,7 +443,7 @@ export default function RetinalGlobe({
     }
   }, [fundusImageBase64, probMapBase64, skeletonBase64]);
 
-  // Shader Uniform Updates
+  // --- Shader Uniform Updates ---
   useEffect(() => {
     if (materialRef.current) {
       materialRef.current.uniforms.uGlowThreshold.value = glowThreshold;
@@ -456,7 +456,7 @@ export default function RetinalGlobe({
     }
   }, [glowThreshold, reliefScale, explodedLayers]);
 
-  // 3D Landmarks & Bifurcation Nodes
+  // --- 3D Landmarks & Bifurcation Nodes ---
   useEffect(() => {
     if (!beaconGroupRef.current) return;
     const group = beaconGroupRef.current;
@@ -478,7 +478,7 @@ export default function RetinalGlobe({
       return new THREE.Vector3(x, y, z);
     };
 
-    // 1. Optic Disc Reticle Beacon (Emerald Green)
+    // --- Optic Disc Beacon ---
     if (opticDisc) {
       const odPos = mapPixelToCup(opticDisc.x, opticDisc.y);
       const ringGeo = new THREE.RingGeometry(0.12, 0.14, 32);
@@ -495,7 +495,7 @@ export default function RetinalGlobe({
       group.add(odBeacon);
     }
 
-    // 2. Fovea Reticle Beacon (Amber Gold)
+    // --- Fovea Beacon ---
     if (fovea) {
       const fovPos = mapPixelToCup(fovea.x, fovea.y);
       const ringGeo = new THREE.RingGeometry(0.08, 0.10, 32);
@@ -512,7 +512,7 @@ export default function RetinalGlobe({
       group.add(fovBeacon);
     }
 
-    // 3. Geodesic Arc Connecting Optic Disc and Fovea
+    // --- Geodesic Disc-to-Fovea Arc ---
     if (opticDisc && fovea) {
       const p1 = mapPixelToCup(opticDisc.x, opticDisc.y);
       const p2 = mapPixelToCup(fovea.x, fovea.y);
@@ -527,7 +527,7 @@ export default function RetinalGlobe({
       group.add(arcLine);
     }
 
-    // 4. Vascular Bifurcation Starlight Landmarks
+    // --- Vascular Bifurcation Landmarks ---
     if (landmarks.length > 0) {
       const pts = landmarks.slice(0, 64);
       const starGeo = new THREE.SphereGeometry(0.02, 8, 8);

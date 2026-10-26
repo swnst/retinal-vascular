@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -116,7 +115,7 @@ def get_presets():
     presets.append(PresetItem(
         id="ocular_dense_24",
         title="High-Density Microvasculature",
-        description="High-density vascular tree (10.8% vessel density) ideal for 3D shader relief extrusion and exploded skeleton layers.",
+        description="High-density vascular tree (12.7% vessel density) ideal for 3D shader relief extrusion and exploded skeleton layers.",
         dataset="DRIVE",
         scenario="dense_clinical",
         target_stage="ocular",
@@ -129,7 +128,7 @@ def get_presets():
     presets.append(PresetItem(
         id="ocular_sparse_23",
         title="Low-Caliber Peripheral Tree",
-        description="Sparse/faint vascular network (5.7% density) for testing U-Net probability threshold sensitivity and gap filling.",
+        description="Sparse/faint vascular network (7.8% density) for testing U-Net probability threshold sensitivity and gap filling.",
         dataset="DRIVE",
         scenario="sparse_clinical",
         target_stage="ocular",
@@ -182,7 +181,7 @@ def get_presets():
     presets.append(PresetItem(
         id="match_sparse_23",
         title="Subject 23 Low-Node Pair",
-        description="Same subject with only 43 bifurcation nodes testing Delaunay graph stability under sparse keypoints.",
+        description="Same subject with only 34 bifurcation nodes testing Delaunay graph stability under sparse keypoints.",
         dataset="DRIVE",
         scenario="sparse_clinical",
         target_stage="matching",
@@ -195,7 +194,7 @@ def get_presets():
     presets.append(PresetItem(
         id="match_dense_24",
         title="Subject 24 High-Node Pair",
-        description="Same subject with 171 Delaunay triangles testing Hungarian bipartite assignment in crowded topologies.",
+        description="Same subject with 142 Delaunay triangles testing Hungarian bipartite assignment in crowded topologies.",
         dataset="DRIVE",
         scenario="dense_clinical",
         target_stage="matching",

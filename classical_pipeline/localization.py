@@ -32,7 +32,7 @@ def find_optic_disk(vessel_map: np.ndarray, green_image: np.ndarray) -> tuple[in
     NotImplementedError
         Interface stub awaiting implementation from classical pipeline.
     """
-    raise NotImplementedError("find_optic_disk() is a stub and will be implemented by Dawit.")
+    raise NotImplementedError("find_optic_disk() is an interface stub; use classical_pipeline.localization_api.find_optic_disk.")
 
 
 def find_fovea(vessel_map: np.ndarray, optic_disk_xy: tuple[int, int]) -> tuple[int, int]:
@@ -56,4 +56,4 @@ def find_fovea(vessel_map: np.ndarray, optic_disk_xy: tuple[int, int]) -> tuple[
     NotImplementedError
         Interface stub awaiting implementation from classical pipeline.
     """
-    raise NotImplementedError("find_fovea() is a stub and will be implemented by Dawit.")
+    raise NotImplementedError("find_fovea() is an interface stub; use classical_pipeline.localization_api.find_fovea.")

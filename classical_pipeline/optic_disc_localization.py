@@ -9,7 +9,7 @@ from skimage.morphology import skeletonize as skimage_skeletonize
 
 try:
     from .skeleton_metrics import prune_short_spurs
-except ImportError:  # Direct script execution from classical_pipeline/.
+except ImportError:
     from skeleton_metrics import prune_short_spurs
 
 
@@ -203,7 +203,7 @@ def appearance_response(image_bgr, fov_mask, config):
         upper_percentile=99.5,
     )
 
-    # OD tissue is usually bright and pale/yellow-white, not just red.
+    # --- Pale/Yellow-White OD Tissue Cues ---
     pale_yellow = (
         0.35 * lightness_norm
         + 0.25 * np.minimum(red_norm, green_norm)

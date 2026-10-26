@@ -5,7 +5,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial import cKDTree, Delaunay
 
-from matching.bifurcation import detect_bifurcations, detect_crossovers, filter_points_around_od
+from matching.bifurcation import detect_bifurcations, filter_points_around_od
 from matching.skeleton import skeletonize_vessel
 from matching.triangulation import (
     build_delaunay_triangulation,

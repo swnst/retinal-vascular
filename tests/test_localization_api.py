@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from classical_pipeline.localization_api import find_fovea, find_optic_disk
 
@@ -8,16 +7,13 @@ from classical_pipeline.localization_api import find_fovea, find_optic_disk
 def test_find_optic_disk_and_fovea_synthetic():
     h, w = 200, 200
     green = np.full((h, w), 128, dtype=np.uint8)
-    # Bright spot for OD at (50, 100)
     y, x = np.ogrid[:h, :w]
     od_mask = ((x - 50) ** 2 + (y - 100) ** 2) <= 15**2
     green[od_mask] = 250
 
-    # Dark spot for Fovea at (130, 100)
     fov_spot = ((x - 130) ** 2 + (y - 100) ** 2) <= 10**2
     green[fov_spot] = 20
 
-    # Vessel map with basic lines
     vessel = np.zeros((h, w), dtype=np.uint8)
     vessel[100, 30:170] = 1
     vessel[80:120, 50] = 1

@@ -18,19 +18,18 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-# Add project root to sys.path
+# --- Project Root Configuration ---
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 import cv2
 import numpy as np
-from PIL import Image
 import torch
 import torch.nn as nn
 
 from dl_pipeline.predict import predict_vessel_mask, load_model_checkpoint
-from dl_pipeline.data_utils import discover_dataset_samples
+from dl_pipeline.data_utils import discover_dataset_samples, load_rgb_image, load_binary_gt_mask
 from dl_pipeline.dataset import split_samples
 from dl_pipeline.postprocess import refine_vessel_mask
 from classical_pipeline.fovea_localization import estimate_fov_mask
@@ -49,7 +48,7 @@ def evaluate_samples(
     max_eval_samples: int | None = None,
 ) -> dict[str, float]:
     """
-    Evaluate sample images in a dataset and return averaged metrics.
+    Evaluate sample images in a dataset and return averaged metrics with standard deviations.
     """
     eval_list = list(samples[:max_eval_samples]) if max_eval_samples else list(samples)
     if not eval_list:
@@ -57,19 +56,28 @@ def evaluate_samples(
             "dataset": dataset_name,
             "num_samples": 0,
             "accuracy": 0.0,
+            "accuracy_std": 0.0,
             "sensitivity": 0.0,
+            "sensitivity_std": 0.0,
             "specificity": 0.0,
+            "specificity_std": 0.0,
             "f1_score": 0.0,
+            "f1_score_std": 0.0,
             "dice": 0.0,
+            "dice_std": 0.0,
             "auc_roc": 0.0,
+            "auc_roc_std": 0.0,
         }
 
     accs, sens, specs, f1s, dices, aucs = [], [], [], [], [], []
 
     for img_path, mask_path in eval_list:
+        rgb_img = load_rgb_image(img_path)
+        gt_mask = load_binary_gt_mask(mask_path, target_shape=rgb_img.shape[:2])
+
         bin_mask, prob_map = predict_vessel_mask(
             model=model,
-            image=img_path,
+            image=rgb_img,
             device=device,
             threshold=threshold,
             return_original_size=True,
@@ -79,26 +87,11 @@ def evaluate_samples(
         if apply_postprocess:
             bin_mask = refine_vessel_mask(bin_mask, min_size=25, max_hole_size=15)
 
-        import gzip
-        import io
-        if str(mask_path).endswith(".gz"):
-            with gzip.open(mask_path, "rb") as gz_file:
-                with Image.open(io.BytesIO(gz_file.read())) as m_pil:
-                    gt_mask = np.array(m_pil.convert("L"))
-        else:
-            with Image.open(mask_path) as m_pil:
-                gt_mask = np.array(m_pil.convert("L"))
-
-        if gt_mask.shape != bin_mask.shape:
-            gt_resized = Image.fromarray(gt_mask).resize((bin_mask.shape[1], bin_mask.shape[0]), Image.NEAREST)
-            gt_mask = np.array(gt_resized)
-
         fov = None
         if use_fov_mask:
             try:
-                bgr_img = cv2.imread(str(img_path))
-                if bgr_img is not None:
-                    fov = estimate_fov_mask(bgr_img)
+                bgr_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+                fov = estimate_fov_mask(bgr_img)
             except Exception:
                 fov = None
 
@@ -116,11 +109,17 @@ def evaluate_samples(
         "dataset": dataset_name,
         "num_samples": len(eval_list),
         "accuracy": float(np.mean(accs)),
+        "accuracy_std": float(np.std(accs)),
         "sensitivity": float(np.mean(sens)),
+        "sensitivity_std": float(np.std(sens)),
         "specificity": float(np.mean(specs)),
+        "specificity_std": float(np.std(specs)),
         "f1_score": float(np.mean(f1s)),
+        "f1_score_std": float(np.std(f1s)),
         "dice": float(np.mean(dices)),
+        "dice_std": float(np.std(dices)),
         "auc_roc": float(np.mean(aucs)),
+        "auc_roc_std": float(np.std(aucs)),
     }
 
 
@@ -144,8 +143,11 @@ def generate_markdown_report(
     if val_result is not None:
         lines.append(
             f"| **{val_result['dataset']}** | {val_result['num_samples']} | "
-            f"{val_result['accuracy']:.4f} | {val_result['sensitivity']:.4f} | "
-            f"{val_result['specificity']:.4f} | {val_result['dice']:.4f} | {val_result['auc_roc']:.4f} |"
+            f"{val_result['accuracy']:.4f} (+/- {val_result.get('accuracy_std', 0.0):.4f}) | "
+            f"{val_result['sensitivity']:.4f} (+/- {val_result.get('sensitivity_std', 0.0):.4f}) | "
+            f"{val_result['specificity']:.4f} (+/- {val_result.get('specificity_std', 0.0):.4f}) | "
+            f"{val_result['dice']:.4f} (+/- {val_result.get('dice_std', 0.0):.4f}) | "
+            f"{val_result['auc_roc']:.4f} (+/- {val_result.get('auc_roc_std', 0.0):.4f}) |"
         )
 
     lines.extend([
@@ -159,8 +161,11 @@ def generate_markdown_report(
     for r in results_dataset:
         lines.append(
             f"| **{r['dataset']}** | {r['num_samples']} | "
-            f"{r['accuracy']:.4f} | {r['sensitivity']:.4f} | "
-            f"{r['specificity']:.4f} | {r['dice']:.4f} | {r['auc_roc']:.4f} |"
+            f"{r['accuracy']:.4f} (+/- {r.get('accuracy_std', 0.0):.4f}) | "
+            f"{r['sensitivity']:.4f} (+/- {r.get('sensitivity_std', 0.0):.4f}) | "
+            f"{r['specificity']:.4f} (+/- {r.get('specificity_std', 0.0):.4f}) | "
+            f"{r['dice']:.4f} (+/- {r.get('dice_std', 0.0):.4f}) | "
+            f"{r['auc_roc']:.4f} (+/- {r.get('auc_roc_std', 0.0):.4f}) |"
         )
 
     lines.append("")
@@ -194,7 +199,7 @@ def run_full_evaluation(
     data_p = Path(data_dir)
     results = []
 
-    # 1. Held-out validation split
+    # --- Held-Out Validation Benchmark ---
     all_samples = discover_dataset_samples(data_p, dataset_name="ALL")
     val_samples = split_samples(all_samples, split="val", split_ratios=(0.8, 0.2, 0.0), seed=42)
     val_res = None
@@ -212,7 +217,7 @@ def run_full_evaluation(
             max_eval_samples=max_eval_samples,
         )
 
-    # 2. Per-dataset evaluation
+    # --- Per-Dataset Evaluation ---
     for ds_name in ["DRIVE", "HRF", "STARE"]:
         ds_path = data_p / ds_name
         if not ds_path.exists():

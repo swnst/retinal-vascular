@@ -1,4 +1,3 @@
-from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -43,7 +42,7 @@ class MatchRequest(BaseModel):
     image_b_base64: str
     ratio_tolerance: float = Field(0.05, ge=0.01, le=0.2)
     angle_tolerance_rad: float = Field(0.08, ge=0.01, le=0.5)
-    # 11-Parameter Physical & Clinical Perturbation Suite
+    # --- 11-Parameter Physical & Clinical Perturbation Suite ---
     rotate_deg_b: float = Field(0.0, ge=-180.0, le=180.0, description="Patient head tilt / cyclorotation in degrees")
     scale_factor_b: float = Field(1.0, ge=0.50, le=2.00, description="Camera working-distance scale factor")
     brightness_b: float = Field(1.0, ge=0.20, le=3.00, description="Flash discharge intensity / illumination factor")

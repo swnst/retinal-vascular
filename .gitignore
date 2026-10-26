@@ -28,6 +28,7 @@ env/
 
 # Jupyter / Colab
 .ipynb_checkpoints/
+notebooks/
 
 # OS
 .DS_Store
@@ -37,16 +38,18 @@ Thumbs.db
 *.log
 wandb/
 
-# AI Agent & Assistant Files
-GEMINI.md
-GEMINI.yaml
-.gemini/
-.geminirules
-CLAUDE.md
-.claude/
-AGENTS.md
-.agents/
-.cursorrules
-.cursor/
-.windsurfrules
-.antigravity/
+# --- Heavy Binary Visualization Outputs ---
+results/vessel_prediction_samples.png
+results/localization/visualizations/
+*.png.bak
+
+# --- Local Environment & Secret Protection ---
+.env
+.env.local
+.env.*.local
+
+# --- Local Tooling & IDE Caches ---
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/

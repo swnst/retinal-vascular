@@ -1,421 +1,411 @@
-# VERA: Vascular Extraction & Retinal Authentication Platform
+# VERA: Vascular Extraction and Retinal Authentication Platform
 
-### Personal Biometric Verification & 3D Ocular Anatomy System via Deep Learning Vessel Segmentation, Rutovitz Crossing Number Topology, and Kabsch SE(2) Induced Delaunay Triangulation
+### Personal Biometric Verification and 3D Ocular Anatomy System via Deep Learning Vessel Perception, Rutovitz Crossing Number Topology, and Kabsch SE(2) Induced Delaunay Triangulation
 
-**Senior Capstone Project (Capstone I & II)**  
-Department of Computer Engineering, Faculty of Engineering
+Department of IoT and Information Engineering  
+Program in IoT and Information Engineering and Industrial Physics (Dual Degree)  
+School of Engineering, King Mongkut's Institute of Technology Ladkrabang (KMITL)
 
-- **Project Advisors**: Asst. Prof. Isoon Kanjanasurat, Dr. Nitjaree Satayarak
-- **Development Team**:
-  - Dawit (Classical Image Processing Pipeline, Anatomical Landmark Localization & Keypoint Topology)
-  - Viwat (Deep Learning Perception Pipeline, Biometric Matching Engine, API & System Integration)
-- **Theoretical Reference & Foundation**: Kanjanasurat et al. (2020) — *Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern*
+- Project Authors:
+  - Wiwat Suwannasit (วิวรรธน์ สุวรรณสิทธิ์)
+  - Dvis Vichitlaksana (ดวิษ วิจิตรลักษณา)
+- Academic Advisors:
+  - Asst. Prof. Isoon Kanjanasurat (ผศ. อิสูรย์ กาญจนสุรัตน์)
+  - Asst. Prof. Dr. Nitjaree Satayarak (ผศ. ดร. นิจจารีย์ สัตยารักษ์)
+- Foundational Literature:
+  - Kanjanasurat et al. (2020), "Vascular Extraction by using matched filter on retinal image", *Journal of Physics: Conference Series*, DOI: 10.1088/1742-6596/1457/1/012013, URL: https://iopscience.iop.org/article/10.1088/1742-6596/1457/1/012013
+  - Kanjanasurat, Purahong, Pintavirooj, Satayarak, and Benjangkaprasert (2020), "Blood Vessel Extraction and Optic Disk Localization for Diabetic Retinopathy", *ACM ICBET*, DOI: 10.1145/3397391.3397425, URL: https://dl.acm.org/doi/10.1145/3397391.3397425
+  - Kanjanasurat et al. (2020), "Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern", *IJICIC*, Vol. 16, No. 3, pp. 879-897, DOI: 10.24507/ijicic.16.03.879 (JaLC), URL: http://www.ijicic.org/ijicic-160307.pdf
 
 ---
 
-## 1. Executive Summary & Capstone I Scope Analysis
+## 1. Executive Summary and Capstone Scope Analysis
 
-The VERA platform is an end-to-end medical-grade biometric authentication and anatomical analysis system that leverages the unique morphology of human retinal vasculature. Unlike iris or fingerprint biometrics, retinal vascular patterns are internal, stable throughout human life (barring severe pathology), impossible to forge or spoof synthetically, and serve as an authoritative biological identifier.
+VERA is an end-to-end biometric verification and ocular anatomical analysis system built on retinal vascular morphology. Unlike facial, voice, or epidermal fingerprint modalities, the vascular branching pattern of the human fundus oculi is internal, genetically unique (even between monozygotic twins), and topologically stable throughout adulthood.
 
-### Capstone I Initial Scope vs. Delivered Project Reality
+### Initial Capstone I Target vs. Delivered System Reality
 
-During the initial proposal of Senior Capstone I, the baseline objective was to prove the feasibility of extracting retinal vessel bifurcations from fundus images and verifying identity using basic Delaunay triangle invariants on clean DRIVE images, demonstrated via a basic desktop GUI or Gradio prototype.
+The original Capstone I project proposal specified a baseline proof-of-concept: evaluating standard U-Net segmentation on clean DRIVE fundus images, extracting basic bifurcation points, computing Delaunay triangle invariants, and rendering results in a basic standalone script.
 
-Through rigorous development and mathematical research, **the project delivered in Capstone I significantly exceeds the original scope across all dimensions**, advancing from a preliminary research prototype to a production-grade enterprise platform:
+The implemented platform exceeds the original targets across all core engineering dimensions:
 
-| Evaluation Dimension | Initial Capstone I Target | Delivered System (Current Reality) | Delivery Status |
+| Evaluation Dimension | Initial Capstone I Target | Delivered System Reality | Status |
 | :--- | :--- | :--- | :---: |
-| **Segmentation Model** | Basic U-Net with ~0.70 Dice on DRIVE | Dual-Stream Self-Consistent U-Net (`best_unet_model_v3.pth`) with ResNet-34 encoder, reaching **0.7848 Dice, 0.9652 AUC, 98.66% Specificity** | **Exceeded Target** |
-| **Binarization Strategy** | Fixed 0.50 probability cutoff | **Quantile-Calibrated Adaptive Thresholding** ($\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))$) resilient to cataract opacity | **Exceeded Target** |
-| **Landmark Localization** | Basic center detection on DRIVE | Multi-stage Hough & Vessel Convergence on 103 high-resolution IDRiD images (**99.03% OD Success, 94.17% Fovea Success**) | **Exceeded Target** |
-| **Matching Algorithm** | Standard Delaunay Invariants (fails under point dropout) | **3-Stage Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** | **Exceeded Target** |
-| **Stress Resilience** | None (evaluated only on clean static images) | **11-Parameter Physical & Clinical Degradation Engine** with 8 stress vectors; passes 7-parameter `Judge Torture` at **63.4%** | **Exceeded Target** |
-| **Software Architecture** | Standalone Python scripts & Gradio demo | **Decoupled Enterprise Stack**: FastAPI 2.0 Backend + Next.js 16 App Router Turbopack Frontend | **Exceeded Target** |
-| **Visualization & UX** | 2D matplotlib plots | **3-Stage Interactive Three.js WebGL Studio**: 3D Retinal Globe with depth GLSL shader, Dual 3D Matcher with laser correspondence beams, and 4x4 Population Cohort Matrix | **Exceeded Target** |
-| **Quality Gate & Tests** | Minimal manual tests | **Automated Suite of 29 Pytest Tests**, ESLint (0 errors, 0 warnings), Strict TypeScript (0 errors), Next.js Turbopack build in 1.2s | **Exceeded Target** |
+| **Vessel Segmentation** | Standard U-Net (~0.70 Dice on DRIVE) | ResNet-34 U-Net v3 (`best_unet_model_v3.pth`, 24.4M params) with Tripartite BCE + Soft Dice + Soft-clDice loss reaching **0.7809 Dice, 0.9710 ROC-AUC, 97.56% Specificity** on DRIVE (0.7554 Dice, 0.9562 AUC on zero-leakage held-out validation) | Exceeded Target |
+| **Probability Binarization** | Static 0.50 cutoff | **Piecewise Quantile-Calibrated Adaptive Thresholding** ($`\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))`$ for $`p_{95} < 0.85`$, else $`0.60`$) resilient to cataract opacity | Exceeded Target |
+| **Landmark Localization** | Basic center heuristic on DRIVE | **3-Cue Structure-Tensor Convergence & Anisotropic Macular Prior** on 103 high-resolution IDRiD images (**99.03% OD Success, 94.17% Fovea Success**) | Exceeded Target |
+| **Biometric Matcher** | Independent Delaunay Invariants (fails under vertex dropout) | **3-Stage Star-Vector + Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** | Exceeded Target |
+| **Clinical Robustness** | None (clean static scans only) | **11-Parameter Physical Degradation Suite**; passes 7-parameter `Judge Torture` stress at **63.4%** matching score (threshold: 20.0%) | Exceeded Target |
+| **Software Architecture** | Standalone Python scripts | **Decoupled Architecture**: FastAPI 2.0 Backend + Next.js 16 App Router Turbopack Frontend | Exceeded Target |
+| **Visualization and UI** | Static 2D plots | **3-Stage Three.js WebGL Studio**: 3D Retinal Globe with depth GLSL shader, Dual 3D Matcher with laser correspondence beams, and 4x4 Cohort Matrix | Exceeded Target |
+| **Automated Testing** | Manual inspection | **Automated Suite of 40 Pytest Tests**, ESLint (0 errors), Strict TypeScript (0 errors), Next.js Turbopack build | Exceeded Target |
 
 ---
 
 ## 2. System Architecture
 
-The platform architecture is divided into five modular, decoupled layers:
+The platform architecture is organized into five modular subsystems:
 
-```mermaid
-flowchart TD
-    subgraph Layer1["1. Input & Degradation Layer"]
-        ScanA["Fundus Scan A (Reference)"]
-        ScanB["Fundus Scan B (Target)"]
-        PerturbEngine["11-Parameter Clinical Perturbation Engine\n(Tilt, Zoom, Haze, Glare, Blur, Noise, Occlusion, Warp, IOP Elastic)"]
-        ScanB --> PerturbEngine
-        PerturbEngine --> ScanBPert["Perturbed Scan B"]
-    end
-
-    subgraph Layer2["2. Deep Learning Perception Layer"]
-        UNetModel["ResNet-34 U-Net (best_unet_model_v3.pth)\nDual-Stream Self-Consistent Inference"]
-        ScanA --> UNetModel
-        ScanBPert --> UNetModel
-        UNetModel --> TTA["Test-Time Augmentation (Horizontal Flip)"]
-        TTA --> ProbMaps["Continuous Probability Maps (0.0 to 1.0)"]
-        ProbMaps --> AdaptiveThresh["Quantile-Calibrated Adaptive Thresholding"]
-        AdaptiveThresh --> PostProcess["Morphological Filtering & Hole Filling"]
-        PostProcess --> VesselMasks["Binary Vessel Trees A & B"]
-    end
-
-    subgraph Layer3["3. Anatomical Localization & Topology Layer"]
-        VesselMasks --> Thinning["Zhang-Suen Medial Axis Thinning"]
-        Thinning --> RutovitzCN["Rutovitz Crossing Number Calculation"]
-        RutovitzCN --> SpurPruning["Spur Pruning & Keypoint Extraction"]
-        ScanA --> LocEngine["Classical Hough & Vessel Convergence Localization"]
-        ScanBPert --> LocEngine
-        LocEngine --> Landmarks["Optic Disc & Fovea Centralis Centers"]
-    end
-
-    subgraph Layer4["4. Biometric Matching Engine (matching/matcher.py)"]
-        SpurPruning --> Stage1Matcher["Stage 1: Intrinsic Triangle Angle & Neighbor Ratio Assignment"]
-        Stage1Matcher --> Stage2Matcher["Stage 2: Star-Vector cKDTree + Kabsch SE(2) SVD Consensus"]
-        Stage2Matcher --> Stage3Matcher["Stage 3: Induced Common-Subgraph Delaunay Triangulation"]
-        Stage3Matcher --> BiometricDecision["Consensus Score & Authentication Verdict"]
-    end
-
-    subgraph Layer5["5. Clinical Presentation & WebGL Studio (web/ + api/)"]
-        BiometricDecision --> FastAPIService["FastAPI 2.0 REST Backend (api/)"]
-        FastAPIService --> WebGLStudio["Next.js 16 WebGL Client Studio"]
-        WebGLStudio --> Stage01["Stage 01: 3D Spherical Retinal Globe with Volumetric Shader"]
-        WebGLStudio --> Stage02["Stage 02: 3D Dual-Eye Constellation Matcher & Lasers"]
-        WebGLStudio --> Stage03["Stage 03: 4x4 Population Cohort Matrix & Stress Telemetry"]
-    end
 ```
+[1. Ocular Image Input & 11-Param Degradation Suite]
+                         │
+                         ▼
+[2. Deep Learning Perception (ResNet-34 U-Net v3 + TTA)]
+                         │
+                         ▼
+[3. Quantile Adaptive Thresholding & Morphological Cleanup]
+                         │
+                         ▼
+[4. Zhang-Suen Skeletonization & Rutovitz Crossing Number Minutiae]
+                         │
+                         ▼
+[5. Kabsch SVD Rigid Consensus & Induced Subgraph Delaunay Matching]
+                         │
+                         ▼
+[FastAPI 2.0 REST Services] <───> [Next.js 16 Three.js WebGL Studio]
+```
+
+### Module Pipeline Summary
+
+1. **Input and Degradation Suite**: Ingests reference (Scan A) and target (Scan B) fundus photographs. An 11-parameter physical engine simulates real-world clinical stressors including head tilt ($\pm 45^\circ$), axial scale/zoom ($0.80\text{x} - 1.20\text{x}$), cataract media haze ($0.0 - 0.95$), corneal surface glare, sensor ISO noise, eyelid occlusion, spherical optical warp, and pulsatile intraocular pressure (IOP) elastic displacements ($\sigma = 6.0$ px).
+2. **Deep Learning Perception Layer**: Executes inference via a 24.4M-parameter U-Net with ImageNet-pretrained ResNet-34 backbone. Includes Test-Time Augmentation (TTA: horizontal flip averaging) ingesting normalized RGB imagery.
+3. **Adaptive Thresholding and Postprocessing**: Dynamically calculates effective binarization cutoffs based on the 95th percentile intensity of the predicted foreground probability within the Field of View (FOV). Removes isolated noise components smaller than 25 pixels and applies morphological binary hole filling.
+4. **Anatomical Landmark Localization**: Detects the Optic Disc (OD) via 3-cue multi-color-space density, structure-tensor tangent ray voting, and pale hue fusion. Fovea centralis coordinates are extracted through an OD-anchored anisotropic 2D Gaussian spatial prior fused with macular darkness cues.
+5. **Centerline Thinning and Minutiae Extraction**: Generates 1-pixel unitary skeletons via Zhang-Suen morphological thinning with short spur pruning. Minutiae points are classified using Rutovitz Crossing Number with digital grid diagonal rescue ($`(X \ge 3) \lor (X = 2 \land N_8 \ge 3)`$) and FOV-scaled greedy Euclidean non-maximum suppression ($`d_{\min} = \max(6.0, 0.012 \cdot D_{\text{FOV}})`$ px).
+6. **3-Stage Constellation Alignment and Induced Subgraph Delaunay Matching**: Employs Stage 1 triangle invariant seeding with Kuhn-Munkres assignment, Stage 2 Star-Vector polar segment hypotheses with k-d tree inlier search and closed-form Kabsch $\text{SO}(2)$ SVD procrustes alignment, and Stage 3 Induced Common-Subgraph Delaunay Triangulation on mutual inliers, eliminating false rejections caused by independent Delaunay re-triangulation under point dropout.
 
 ---
 
-## 3. Mathematical & Algorithmic Formulation
+## 3. Mathematical Foundations and Literature Citations
 
-### 3.1 Deep Learning Vessel Perception & Loss Formulation
+Every algorithmic component in the VERA platform is derived from verified mathematical literature:
 
-The segmentation backbone employs a modified U-Net architecture with an ImageNet-pretrained ResNet-34 encoder. Training optimizes a balanced composite loss function combining Binary Cross-Entropy (BCE) for pixel-wise classification and Soft Dice Loss for topological boundary overlap:
+### 3.1 CLAHE Illumination Equalization
+To normalize intra-retinal illumination gradients across variable fundus pigmented backgrounds in classical matched filtering and stochastic training data augmentation:
 
-$$\mathcal{L}_{\text{total}} = 0.5 \cdot \mathcal{L}_{\text{BCE}} + 0.5 \cdot \mathcal{L}_{\text{Dice}}$$
+$$h_{\text{clipped}}(n) = \min(h(n), \beta)$$
+$$g(x,y) = \left[ g_{\max} - g_{\min} \right] \cdot P(f(x,y)) + g_{\min}$$
 
-$$\mathcal{L}_{\text{BCE}} = -\frac{1}{N} \sum_{i=1}^{N} \left[ y_i \log(\hat{y}_i) + (1 - y_i) \log(1 - \hat{y}_i) \right]$$
+CLAHE is utilized in `classical_pipeline/bezier_matched_filter.py` (`clipLimit=2.0`, Green channel) and as a stochastic augmentation in `dl_pipeline/dataset.py` (`clip_limit=2.5`), while deterministic DL inference operates directly on normalized RGB images.
 
-$$\mathcal{L}_{\text{Dice}} = 1 - \frac{2 \sum_{i=1}^{N} y_i \hat{y}_i + \epsilon}{\sum_{i=1}^{N} y_i + \sum_{i=1}^{N} \hat{y}_i + \epsilon}$$
+*Citation:* Zuiderveld, K. (1994). Contrast Limited Adaptive Histogram Equalization. *Graphics Gems IV*, Academic Press, pp. 474-485. DOI: 10.1016/B978-0-12-336156-1.50061-6.
 
-Where $y_i \in \{0, 1\}$ is ground-truth vessel occupancy, $\hat{y}_i \in [0, 1]$ is the sigmoid output, and $\epsilon = 1.0$ prevents division by zero.
+### 3.2 High-Frequency Noise Estimation (MAD) and Gated Non-Local Means
+Estimates background sensor noise standard deviation $\hat{\sigma}$ with a 50% statistical breakdown point across spatial Gaussian residuals $`r(x,y) = |I_G - G_{\sigma=0.8} \ast I_G|`$ strictly within the active Field of View (FOV):
 
-### 3.2 Test-Time Augmentation (TTA) & Quantile-Calibrated Adaptive Thresholding
+$$\hat{\sigma} = \frac{\text{median}\left( r(x,y) \big|_{\text{FOV}} \right)}{0.6745}$$
 
-During inference, Test-Time Augmentation computes the ensemble probability across horizontal reflections:
+When $\hat{\sigma} > 4.2$, adaptive Non-Local Means filtering is executed with filter strength $h = \min(11.0, \max(5.0, 0.65\hat{\sigma}))$, suppressing sensor noise while leaving clean clinical scans untouched.
 
-$$\hat{P}(x, y) = \frac{1}{2} \left[ P_{\text{model}}(I(x, y)) + \text{Flip}_H\left(P_{\text{model}}(\text{Flip}_H(I(x, y)))\right) \right]$$
+*Citations:*
+- Donoho, D. L., and Johnstone, I. M. (1994). Ideal spatial adaptation by wavelet shrinkage. *Biometrika*, 81(3), 425-455. DOI: 10.1093/biomet/81.3.425.
+- Buades, A., Coll, B., and Morel, J.-M. (2005). A non-local algorithm for image denoising. *IEEE CVPR 2005*, pp. 60-65. DOI: 10.1109/CVPR.2005.38.
 
-Under optical degradations such as cataract haze or defocus blur, the global probability distribution inside the Field of View (FOV) compresses. Instead of a rigid $0.60$ cutoff that causes fine micro-vessel dropouts, the system calculates the 95th-percentile probability $p_{95} = \text{Percentile}(\hat{P}_{\text{FOV}}, 95.0)$. When $p_{95} < 0.85$, the threshold dynamically recalibrates:
+### 3.3 Composite Training Loss (BCE + Soft Sorensen-Dice + Soft-clDice)
+Overcomes extreme class imbalance (~91% background vs. ~9% vascular foreground) while enforcing topological continuity in thin 1-pixel terminal capillaries:
 
-$$\tau_{\text{eff}} = \max\left(0.32, \min\left(0.60, 0.65 \cdot p_{95}\right)\right)$$
+$$\mathcal{L}_{\text{total}} = 0.35 \cdot \mathcal{L}_{\text{BCE}} + 0.40 \cdot \mathcal{L}_{\text{Dice}} + 0.25 \cdot \mathcal{L}_{\text{clDice}}$$
+$$\mathcal{L}_{\text{BCE}} = -\frac{1}{N} \sum_{i=1}^N \left[ y_i \log p_i + (1 - y_i) \log(1 - p_i) \right]$$
+$$\mathcal{L}_{\text{Dice}} = 1 - \frac{2 \sum_{i=1}^N p_i y_i + \epsilon}{\sum_{i=1}^N p_i + \sum_{i=1}^N y_i + \epsilon}$$
+$$\mathcal{L}_{\text{clDice}} = 1 - \frac{2 \cdot T_{\text{prec}}(S(P), Y) \cdot T_{\text{sens}}(S(Y), P)}{T_{\text{prec}}(S(P), Y) + T_{\text{sens}}(S(Y), P) + \epsilon}$$
 
-### 3.3 Vascular Skeletonization & Rutovitz Crossing Number Keypoint Extraction
+where $S(X) = \text{ReLU}(X - \text{open}(X))$ performs differentiable soft skeletonization via min-max morphological pooling.
 
-The binary vessel mask is iteratively skeletonized via medial axis thinning. For each foreground pixel $P$ with an 8-connected neighborhood $P_1, P_2, \dots, P_8$ ordered clockwise, the Rutovitz Crossing Number $X(P)$ is computed:
+*Citations:*
+- Milletari, F., Navab, N., and Ahmadi, S. A. (2016). V-Net: Fully Convolutional Neural Networks for Volumetric Medical Image Segmentation. *3DV 2016*, pp. 565-571. DOI: 10.1109/3DV.2016.79.
+- Shit, S. et al. (2021). clDice - a Novel Topology-Preserving Loss Function for Tubular Structure Segmentation. *CVPR 2021*, pp. 16555-16564. DOI: 10.1109/CVPR46437.2021.01629.
 
-$$X(P) = \frac{1}{2} \sum_{i=1}^{8} |P_{i+1} - P_i|, \quad \text{with } P_9 = P_1$$
+### 3.4 Piecewise Quantile-Calibrated Adaptive Thresholding
+To ensure robust foreground binarization across severe inter-patient illumination variance, media opacities, and cataract haze:
 
-- **Endpoint**: $X(P) = 1$
-- **Vessel Segment (Normal path)**: $X(P) = 2$
-- **Bifurcation Point**: $X(P) = 3$
-- **Crossover Point**: $X(P) = 4$
+$$\tau_{\text{eff}} = \begin{cases} \max\left(0.32, \min\left(0.60, 0.65 \cdot p_{95}\right)\right), & \text{if } p_{95} < 0.85 \\ 0.60, & \text{if } p_{95} \ge 0.85 \end{cases}$$
 
-Spurious branches shorter than $15\text{ px}$ from topological boundaries are pruned, yielding an invariant keypoint set $\mathcal{K} = \{(x_k, y_k)\}_{k=1}^K$.
+where $p_{95}$ is the 95th percentile intensity of the predicted foreground vascular probability map calculated strictly within the Field of View (FOV). Clamping to $[0.32, 0.60]$ prevents background noise breakthrough under high clarity while preserving faint vascular trunks under heavy scattering.
 
-### 3.4 Classical Landmark Localization (Optic Disc & Fovea Centralis)
+### 3.5 Morphological Skeletonization (Zhang-Suen and Lee Medial Axis)
+Extracts unitary-width centerlines via parallel boundary pixel deletion based on neighbor count $B(P_1)$ and $0 \to 1$ transition count $A(P_1)$:
 
-1. **Optic Disc (OD)**:
-   - Evaluated on green-channel fundus images where hemoglobin contrast is optimal.
-   - Identified using a hybrid circular Hough transform weighted by regional vascular density and high luminance convergence.
-2. **Fovea Centralis**:
-   - Located within the anatomical Foveal Avascular Zone (FAZ).
-   - Constrained by human ocular geometry: located $2.0 \text{ to } 2.5 \text{ OD diameters}$ temporal to the Optic Disc center, searching within a parabolic vessel-free dark valley.
+$$2 \le B(P_1) \le 6, \quad A(P_1) = 1$$
 
-### 3.5 3-Stage Kabsch SE(2) Invariant Biometric Matcher
+*Citations:*
+- Zhang, T. Y., and Suen, C. Y. (1984). A fast parallel algorithm for thinning digital patterns. *Communications of the ACM*, 27(3), 236-239. DOI: 10.1145/357994.358023.
+- Lee, T.-C., Kashyap, R. L., and Chu, C.-N. (1994). Building Skeleton Models via 3-D Medial Surface Axis Thinning Algorithms. *CVGIP: Graphical Models and Image Processing*, 56(6), 462-478. DOI: 10.1006/cgip.1994.1042.
 
-Standard Delaunay triangulation is sensitive to vertex deletion: when fine vessels drop out under blur or haze, Delaunay triangulates across the resulting hole, altering triangle angles and causing false rejections. VERA solves this via a 3-stage consensus pipeline:
+### 3.6 Minutiae Extraction (Rutovitz Crossing Number)
+Classifies skeleton pixels into terminal endpoints ($X=1$), vessel continuations ($X=2$), bifurcations ($X=3$), and crossovers ($X=4$):
 
-```
-Stage 1: Intrinsic Delaunay Triangle Seeds
-         (Angles α <= β <= γ, Neighbor Area Ratios, Hungarian Assignment)
-                     │
-                     ▼
-Stage 2: Star-Vector Consensus & Kabsch SE(2) SVD Refinement
-         (cKDTree NN vectors, Closed-form SVD rotation/translation estimation)
-                     │
-                     ▼
-Stage 3: Induced Common-Subgraph Delaunay Triangulation
-         (Construct Delaunay only on verified 1-to-1 matching keypoint subset)
-                     │
-                     ▼
-             Biometric Verdict (Threshold tau = 0.20)
-```
+$$X(P) = \frac{1}{2} \sum_{i=1}^8 \left| P_i - P_{i+1} \right|, \quad P_9 = P_1$$
 
-1. **Stage 1 (Seed Extraction)**: Delaunay triangles $\Delta = (v_0, v_1, v_2)$ are extracted on templates A and B. Invariant descriptors include sorted internal angles $\alpha \le \beta \le \gamma$ and neighbor area ratios $R_{ij} = \frac{\text{Area}(\Delta_i)}{\text{Area}(\Delta_j)}$. Pairwise matching costs are computed and assigned via the Munkres/Hungarian algorithm.
-2. **Stage 2 (Kabsch SVD Rigid Consensus)**: Candidate transforms are built from seed pairs and spatial nearest-neighbor vectors ($k \le 5$, distance $10\text{ px} \le L \le 140\text{ px}$). For candidate matched pairs $P_A = \{a_i\}$ and $P_B = \{b_i\}$:
-   $$\mu_A = \frac{1}{M}\sum_{i=1}^M a_i, \quad \mu_B = \frac{1}{M}\sum_{i=1}^M b_i$$
-   $$H = \sum_{i=1}^M (a_i - \mu_A)(b_i - \mu_B)^T$$
-   $$U, \Sigma, V^T = \text{SVD}(H)$$
-   $$R_{\text{opt}} = V \begin{pmatrix} 1 & 0 \\ 0 & \det(V U^T) \end{pmatrix} U^T, \quad t_{\text{opt}} = \mu_B - R_{\text{opt}} \mu_A$$
-   Transform candidates are ranked using spatial consensus distance with a $11.5\text{ px}$ gate.
-3. **Stage 3 (Induced Common-Subgraph Triangulation)**: On validated consensus keypoint constellations ($k \ge 8, \text{inlier ratio} \ge 0.38$), Delaunay triangulation is constructed over the shared point subset. This guarantees that triangle topologies match 1-to-1 without interference from missing interior points. The similarity score is normalized:
-   $$S = \min\left(1.0, \frac{|\text{Matched Triangles}|}{\sqrt{N_{\Delta A} \cdot N_{\Delta B}}}\right)$$
+VERA extends this with a discrete grid diagonal rescue condition: $`\text{is\_bifurcation} = (S(P) > 0) \land (X(P) \ge 3 \lor (X(P) = 2 \land N_8(P) \ge 3))`$ (Line 47), followed by FOV-scaled greedy Euclidean non-maximum suppression ($`d_{\min} = \max(6.0, 0.012 \cdot D_{\text{FOV}})`$ px).
+
+*Citations:*
+- Rutovitz, D. (1966). Pattern recognition. *Journal of the Royal Statistical Society: Series A*, 129(4), 504-530. DOI: 10.2307/2982255.
+- Rosenfeld, A. (1970). Connectivity in Digital Pictures. *Journal of the ACM*, 17(1), 146-160. DOI: 10.1145/321556.321570.
+
+### 3.7 Closed-Form Spatial Alignment (Kabsch SVD Procrustes)
+Derives the optimal rigid rotation matrix $R \in \text{SO}(2)$ and translation vector $t \in \mathbb{R}^2$ minimizing root-mean-square alignment deviation:
+
+$$H = \sum_{i=1}^k (p_i - \bar{p})(q_i - \bar{q})^T = U \Sigma V^T$$
+$$R = V \begin{pmatrix} 1 & 0 \\ 0 & \det(V U^T) \end{pmatrix} U^T, \quad t = \bar{q} - R \bar{p}$$
+
+*Citations:*
+- Kabsch, W. (1976). A solution for the best rotation to relate two sets of vectors. *Acta Crystallographica Section A*, 32(5), 922-923. DOI: 10.1107/S0567739476001873.
+- Kabsch, W. (1978). A discussion of the solution for the best rotation to relate two sets of vectors. *Acta Crystallographica Section A*, 34(5), 827-828. DOI: 10.1107/S0567739478001680.
+
+### 3.8 Delaunay Invariant Geometry and Induced Common-Subgraph Matching
+Triangulates minutiae graphs and computes interior angle, side ratio, and adjacent area ratio invariant descriptors:
+
+$$\boldsymbol{\theta} = (\theta_{\min}, \theta_{\text{mid}}, \theta_{\max}), \quad \boldsymbol{\rho}_{\text{side}} = \left(\frac{s_1}{s_3}, \frac{s_2}{s_3}\right), \quad r_{\text{adj}} = \frac{\min(A_i, A_j)}{\max(A_i, A_j)}$$
+$$C(i, j) = 0.55 \cdot \frac{\Delta\bar{\theta}}{\tau_\theta} + 0.25 \cdot \min_{a, b} \frac{|r_{A,a} - r_{B,b}|}{\tau_r} + 0.20 \cdot \frac{1 - \rho_{\text{area}}}{0.40}$$
+
+To prevent catastrophic false rejections from vertex dropout where independent Delaunay graphs re-triangulate into conflicting topologies, VERA executes **Induced Common-Subgraph Delaunay Triangulation**:
+1. Spatial Minutiae Consensus: Candidate minutiae pairs are identified via Kuhn-Munkres on $`C(i,j) < 0.95`$ (Stage 1) and Star-Vector polar segment hypotheses ($`10 \le \ell \le 140`$ px, $`|\Delta\ell|/\max \le 0.10`$, $`|\Delta\theta| \le 55^\circ`$, Stage 2), aligned globally via Kabsch SE(2) SVD.
+2. Mutual Inlier Gating: Candidate inliers are queried via `cKDTree` within `kp_tol = 11.5 px` with distance-sorted bijective deduplication.
+3. Induced Graph Triangulation: Delaunay triangulation is constructed over the mutual inliers $\mathcal{P}_{\text{mutual}}$, and similarity score is computed as:
+   $$S(A, B) = \min\left(1.0, \, \frac{|\mathcal{M}_{\text{tri}}|}{\max\left(1, \sqrt{|\mathcal{T}_A| \cdot |\mathcal{T}_B|}\right)}\right), \quad \text{Verified if } S(A, B) \ge 0.20$$
+
+*Citation:* Kanjanasurat, I., Purahong, B., Aoyama, H., Benjangkaprasert, C., and Pintavirooj, C. (2020). Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern. *IJICIC*, 16(3), 879-897. DOI: 10.24507/ijicic.16.03.879 (JaLC), URL: http://www.ijicic.org/ijicic-160307.pdf.
+
+### 3.9 Bipartite Assignment (Kuhn-Munkres)
+Solves optimal bipartite assignment between Stage 1 Delaunay triangle invariant descriptors $`C(i,j)`$ (transformed candidate minutiae in Stage 2/3 are subsequently matched via `cKDTree` within `kp_tol = 11.5 px` and greedy distance-sorted bijective deduplication):
+
+$$\min \sum_{i=1}^m \sum_{j=1}^n C_{i,j} X_{i,j}, \quad \text{where } C_{i,j} \text{ represents feature or geometric distance}$$
+
+*Citations:*
+- Kuhn, H. W. (1955). The Hungarian method for the assignment problem. *Naval Research Logistics Quarterly*, 2(1-2), 83-97. DOI: 10.1002/nav.3800020109.
+- Munkres, J. (1957). Algorithms for the assignment and transportation problems. *Journal of the Society for Industrial and Applied Mathematics*, 5(1), 32-38. DOI: 10.1137/0105003.
+
+### 3.10 Spatial Keypoint Indexing (k-d Tree)
+Reduces geometric proximity queries from $O(N \cdot M)$ to $O(N \log M)$:
+
+*Citation:* Bentley, J. L. (1975). Multidimensional binary search trees used for associative searching. *Communications of the ACM*, 18(9), 509-517. DOI: 10.1145/361002.361007.
+
+### 3.11 Optical and Physical Degradation Mechanics
+- **Scale-Invariant Radial Optical Lens Distortion:** $`\tilde{r}_u = \frac{r_u}{r_{\max}}`$, $`x_{\text{dist}} = x_c + (x - x_c)(1 + k \tilde{r}_u^2)`$ (Brown, 1966).
+- **Elastic Biomechanical Strain:** $`d(x,y) = \alpha \cdot \frac{G_{\sigma=6.0} \ast \Delta}{\lVert G_{\sigma=6.0} \ast \Delta \rVert_\infty}`$ with $`31 \times 31`$ Gaussian kernel (Simard et al., 2003).
+- **Cataract Media Opacity & Forward Straylight:** $`I_{\text{cataract}}(x,y) = (1 - h) I(x,y) + h [0.65 L_{\text{veil}} + 0.35 (G_{\sigma=14} \ast I)(x,y)]`$ with $`L_{\text{veil,RGB}} = [210, 165, 125]`$ and $`h \in [0.0, 0.95]`$ (van den Berg, 1995; Vos & van den Berg, 1999).
 
 ---
 
-## 4. Quantitative Benchmark Results
+## 4. Quantitative Experimental Results
 
 ### 4.1 Retinal Vessel Segmentation Benchmark
 
-Evaluated across benchmark clinical datasets (DRIVE, STARE, HRF) using `best_unet_model_v3.pth` with TTA and post-processing:
+Evaluated on multi-dataset benchmarks and independent test splits:
 
-| Dataset | Split | Images | Dice Score | Accuracy | Specificity | Sensitivity | AUC-ROC |
+| Evaluation Dataset / Split | Sample Size | Evaluation Mask | Accuracy | Sensitivity | Specificity | Dice Score | ROC-AUC |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **DRIVE** | Test | 20 | **0.7848** | **96.14%** | **98.66%** | **78.20%** | **0.9652** |
-| **DRIVE** | Val | 4 | **0.7594** | 95.82% | 98.40% | 76.50% | 0.9580 |
-| **STARE** | Test | 20 | **0.7712** | 95.40% | 97.90% | 77.80% | 0.9610 |
-| **HRF** | High-Res | 45 | **0.7680** | 96.02% | 98.15% | 75.90% | 0.9595 |
+| **Zero-Leakage Held-Out Validation Split** | 17 samples | Inside FOV | 0.9515 (+/- 0.0076) | 0.7240 (+/- 0.0407) | 0.9782 (+/- 0.0056) | **0.7554 (+/- 0.0466)** | **0.9562 (+/- 0.0145)** |
+| **DRIVE Benchmark Split** | 20 images | Inside FOV | 0.9473 (+/- 0.0074) | 0.7503 (+/- 0.0360) | 0.9756 (+/- 0.0061) | **0.7809 (+/- 0.0178)** | **0.9710 (+/- 0.0060)** |
+| **STARE Benchmark Split** | 20 images | Inside FOV | 0.9502 (+/- 0.0110) | 0.7500 (+/- 0.0373) | 0.9791 (+/- 0.0049) | **0.7915 (+/- 0.0340)** | **0.9654 (+/- 0.0100)** |
+| **HRF High-Resolution Split** | 45 images | Inside FOV | 0.9541 (+/- 0.0057) | 0.7245 (+/- 0.0435) | 0.9770 (+/- 0.0064) | **0.7384 (+/- 0.0381)** | **0.9506 (+/- 0.0136)** |
+| **Bézier Matched Filter (Kanjanasurat et al., 2020)** | 40 images (DRIVE) | Published [1] | 0.9440 | 0.7300 | 0.9650 | N/A (not in [1]) | N/A (not in [1]) |
+| **Classical Bézier Matched Filter + Inner-FOV Otsu (Local Baseline)** | 20 images (DRIVE) | Inside FOV | 0.9122 (+/- 0.0150) | 0.5058 (+/- 0.0362) | 0.9714 (+/- 0.0153) | **0.5915 (+/- 0.0376)** | **0.7981 (+/- 0.0175)** |
 
-### 4.2 Anatomical Landmark Localization Benchmark (IDRiD Testing Set)
+*Note: Multi-dataset training split combined 80% of DRIVE/STARE/HRF samples; the 17-sample validation split is strictly held-out with zero identity leakage. DRIVE full-frame reference: ACC = 0.9638, SE = 0.7500, SP = 0.9840, Dice = 0.7808, ROC-AUC = 0.9807.*
 
-Evaluated on the IDRiD Localization Challenge testing set (103 images, full clinical resolution $4288 \times 2848$):
+### 4.2 Anatomical Landmark Localization Benchmark (IDRiD Dataset)
 
-| Anatomical Landmark | Metric | Result | Benchmark Tolerance Criteria | Success Rate |
-| :--- | :--- | :---: | :---: | :---: |
-| **Optic Disc (OD) Center** | Mean Euclidean Error | **68.18 px** | $< 120\text{ px}$ ($< 2.8\%$ Image Width) | **99.03%** |
-| **Optic Disc (OD) Center** | Percentage of Image Width | **1.59%** | Sub-diameter accuracy | Passed |
-| **Fovea Centralis Center** | Mean Euclidean Error | **108.11 px** | $< 180\text{ px}$ ($< 4.2\%$ Image Width) | **94.17%** |
-| **Fovea Centralis Center** | Percentage of Image Width | **2.52%** | Anatomical FAZ capture | Passed |
+Evaluated across 103 high-resolution images from the Indian Diabetic Retinopathy Image Dataset (IDRiD, $4288 \times 2848$):
 
-### 4.3 Biometric Identity Authentication Benchmark (DRIVE Identity Pairs)
+| Anatomical Landmark | Images Evaluated | Successful Detections | Mean Pixel Error | Median Pixel Error | Success Rate (Error $\le 5\%$ Width) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Optic Disc (OD Center)** | 103 | 102 | 68.18 px (1.59% width) | 56.99 px (1.33% width) | **99.03%** |
+| **Fovea Centralis** | 103 | 97 | 108.11 px (2.52% width) | 94.88 px (2.21% width) | **94.17%** |
 
-Evaluated across 210 distinct pairings (20 Genuine Pairs, 190 Impostor Pairs):
+*(On HRF 15-image tuning split: OD Mean Error = 27.37 px, Median = 24.19 px, 100% success).*
 
-| Biometric Performance Metric | Measured Value | Standard Clinical Target | Compliance Status |
-| :--- | :---: | :---: | :---: |
-| **Equal Error Rate (EER)** | **4.34%** | $< 5.00\%$ | **Achieved** |
-| **Verification Accuracy @ EER** | **96.19%** | $> 95.00\%$ | **Achieved** |
-| **Area Under ROC Curve (AUC)** | **0.9892** | $> 0.9500$ | **Achieved** |
-| **Optimal Operating Threshold ($\tau$)** | **0.2000** | Balanced separation | **Calibrated** |
-| **Genuine Mean Similarity Score** | **0.3411** | $> 0.2500$ | **Strong separation** |
-| **Impostor Mean Similarity Score** | **0.1225** | $< 0.1500$ | **Zero false acceptances** |
+### 4.3 Biometric Verification and Robustness Benchmark
 
-### 4.4 8-Vector Clinical Stress & "Judge Torture" Resilience Benchmark
+#### Table 4.3A: 20-Subject Verification Benchmark (`matching_evaluation_report.md`)
+Evaluated across 210 pairs (20 Genuine pairs under random $\pm 7^\circ$ tilt, $0.97-1.03\text{x}$ scale, and $0.90-1.10\text{x}$ brightness; 190 Cross-Subject Impostors):
 
-To verify real-world biometric resilience, the system was subjected to 8 clinical degradation vectors, including the 7-parameter simultaneous `Judge Torture` protocol:
+| Metric | Measured Value | Standard Deviation / Range | Benchmark Significance |
+| :--- | :---: | :---: | :--- |
+| **Equal Error Rate (EER)** | **0.00%** | Optimal Operating Threshold = **0.210** | High biometric distinctiveness |
+| **Verification Accuracy @ EER** | **100.00%** | 210 correct decisions out of 210 pairs | Perfect boundary separation |
+| **Verification Accuracy @ 0.200** | **99.52%** | 209 correct decisions out of 210 pairs (FRR: **0.00%** [20/20], FAR: **0.53%** [189/190]) | Production operating threshold |
+| **Genuine Mean Score** | **0.8903** | $\pm 0.0415$ (Range: 0.7992 - 0.9644) | High geometric consensus under perturbation |
+| **Impostor Mean Score** | **0.0058** | $\pm 0.0261$ (Range: 0.0000 - 0.2049; 180/190 score 0.0000) | 21x suppression of background impostor pairs |
 
-| Stress Scenario | Applied Clinical Perturbations | Score | Keypoints (A -> B) | Triangles | Verdict |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Clean Baseline** | $\theta = 0^\circ, s = 1.0\text{x}$ | **100.0%** | $57 \to 57$ | 101 | **VERIFIED** |
-| **Head Tilt & Zoom** | $\theta = +25^\circ, s = 0.85\text{x}$ | **80.8%** | $57 \to 60$ | 84 | **VERIFIED** |
-| **Cataract Haze** | $\text{Haze} = 0.45, \gamma = 0.85$ | **86.4%** | $57 \to 56$ | 86 | **VERIFIED** |
-| **Corneal Flash Glare** | $\text{Glare} = 0.65, \text{Gain} = 0.80$ | **86.7%** | $57 \to 55$ | 84 | **VERIFIED** |
-| **Defocus Accommodation Blur** | $\sigma_{\text{blur}} = 2.5\text{ px}$ | **82.7%** | $57 \to 42$ | 70 | **VERIFIED** |
-| **Low-Light Sensor ISO Noise** | $\sigma_{\text{noise}} = 16.0, \text{Gain} = 0.85$ | **72.7%** | $57 \to 43$ | 62 | **VERIFIED** |
-| **Eyelid Occlusion (Ptosis)** | $\text{Cutoff} = 22\%$ | **86.4%** | $57 \to 51$ | 81 | **VERIFIED** |
-| **Judge Torture (All 7 Combined)** | $\theta=15^\circ, s=0.90, \text{Haze}=0.30, \sigma_b=1.8, \sigma_n=10, \text{Glare}=0.35, \text{Elastic}=2.0\text{px}$ | **63.4%** | $57 \to 37$ | 51 | **VERIFIED** |
-| **Subject 23 (Sparse Graph) Torture** | All 7 Torture parameters | **47.3%** | $34 \to 16$ | 18 | **VERIFIED** |
-| **Subject 24 (Dense Graph) Torture** | All 7 Torture parameters | **43.7%** | $79 \to 36$ | 40 | **VERIFIED** |
-| **Impostor Pair (S01 vs S02) Baseline** | Unperturbed Impostor Pair | **0.0%** | $57 \to 64$ | 0 | **REJECTED** |
-| **Impostor Pair (S01 vs S02) Torture** | 7-Parameter Torture on Impostor | **0.0%** | $57 \to 41$ | 0 | **REJECTED** |
-| **Impostor Pair (S23 vs S24) Torture** | 7-Parameter Torture on Impostor | **0.0%** | $34 \to 36$ | 0 | **REJECTED** |
+#### Table 4.3B: Production Pipeline 8-Preset Clinical Stress Sweep on Subject S01 & 4x4 Cohort Matrix
+Evaluated using the live production `PipelineService` on DRIVE reference Subject 01 (`21_training.tif`) and 4x4 Cohort Matrix (`S01, S02, S23, S24`):
+
+| Evaluation Scenario | Stress Vector Parameters | Verified Pairs | Match Score | FAR | FRR | Verification Decision |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **Clean Baseline** | In-plane $0^\circ$, scale $1.0\text{x}$ | 101 pairs | **100.0%** (1.0000) | 0.00% | 0.00% | Genuine Verified |
+| **Pose Tilt & Zoom** | Tilt $+25^\circ$, scale $0.85\text{x}$ | 84 pairs | **80.8%** (0.8080) | 0.00% | 0.00% | Genuine Verified |
+| **Cataract Media Haze** | Haze $h = 0.45$, gamma $0.85$ | 86 pairs | **86.4%** (0.8644) | 0.00% | 0.00% | Genuine Verified |
+| **Corneal Surface Glare** | Glare intensity $0.65$, brightness $0.80$ | 84 pairs | **86.7%** (0.8667) | 0.00% | 0.00% | Genuine Verified |
+| **Optical Defocus Blur** | Gaussian blur $\sigma = 2.5$ px | 70 pairs | **82.7%** (0.8266) | 0.00% | 0.00% | Genuine Verified |
+| **Low-Light Sensor Noise** | ISO noise $\sigma = 16.0$, brightness $0.85$ | 62 pairs | **72.7%** (0.7271) | 0.00% | 0.00% | Genuine Verified |
+| **Eyelid Occlusion** | Palpebral eyelid occlusion $22\%$ (65% superior / 35% inferior) | 81 pairs | **86.4%** (0.8641) | 0.00% | 0.00% | Genuine Verified |
+| **Multi-Factor Judge Torture** | 7 stressors: Tilt $+15^\circ$, Scale $0.90\text{x}$, Haze $0.30$, Blur $\sigma=1.8$, Noise $\sigma=10$, Glare $0.35$, Elastic $\alpha=2.0$ | 51 pairs | **63.4%** (0.6343) | 0.00% | 0.00% | **Genuine Verified** (threshold: 20.0%) |
+| **Cross-Subject Impostor Cohort** | 12 off-diagonal pairs across `S01, S02, S23, S24` | 0 pairs | **0.0%** (0.0000) | **0.00%** | N/A | **Impostors Rejected** |
 
 ---
 
-## 5. Repository File Structure
+## 5. Repository Structure and Code Layout
 
-```text
+```
 retinal-vascular/
-├── api/                                # FastAPI 2.0 REST Backend Service
-│   ├── main.py                         # Application lifecycle, CORS & endpoint routes
-│   ├── schemas.py                      # Strict Pydantic models with validation bounds
-│   └── services.py                     # Pipeline orchestration, adaptive thresholding & encoding
-├── classical_pipeline/                 # Classical Anatomical Localization & Metrics
-│   ├── fovea_localization.py           # FAZ detection & parabolic minimum search
-│   ├── localization_api.py             # High-level localization interface functions
-│   ├── optic_disc_localization.py      # Circular Hough transform & luminance convergence
-│   └── skeleton_metrics.py             # Skeleton statistics & branch length measurements
-├── dl_pipeline/                        # Deep Learning Perception Pipeline
-│   ├── data_utils.py                   # Dataset discovery & hash indexing utilities
-│   ├── dataset.py                      # Multi-dataset loader & Albumentations pipelines
-│   ├── model.py                        # U-Net architecture with ResNet encoders
-│   ├── postprocess.py                  # Morphological hole filling & noise reduction
-│   ├── predict.py                      # TTA-enabled high-precision inference engine
-│   └── train.py                        # Training engine with BCE+Dice & Cosine scheduler
-├── evaluation/                         # Formal Benchmark & Metric Scripts
-│   ├── evaluate_localization.py        # IDRiD benchmark for Optic Disc & Fovea accuracy
-│   ├── evaluate_matching.py            # DRIVE identity verification benchmark (EER, ROC)
-│   ├── evaluate_vessel.py              # Vessel segmentation evaluation (Dice, AUC, Acc)
-│   ├── metrics.py                      # Biometric metrics (FAR, FRR, EER calculation)
-│   └── threshold_analysis.py           # Threshold optimization via Youden's J statistic
-├── matching/                           # Biometric Graph Matching Engine
-│   ├── bifurcation.py                  # Rutovitz Crossing Number & keypoint extraction
-│   ├── matcher.py                      # 3-Stage Kabsch SE(2) SVD & Induced Delaunay matcher
-│   ├── skeleton.py                     # Zhang-Suen morphological medial axis thinning
-│   └── triangulation.py                # Delaunay triangulation & geometric invariant features
-├── models/                             # Active Production Model Checkpoints
-│   └── best_unet_model_v3.pth          # Dual-Stream ResNet-34 U-Net production weights (93.39 MB)
-├── notebooks/                          # Interactive Cloud Research Notebooks
-│   └── train_colab_v2.ipynb            # Google Colab GPU training notebook
-├── results/                            # Official Benchmark Reports & Figures
-│   └── vessel_evaluation_report.md     # Comprehensive model benchmark records
-├── tests/                              # Automated Pytest Regression Suite (29 Tests)
-│   ├── test_api.py                     # FastAPI endpoint validation & boundary tests
-│   ├── test_localization_api.py        # OD and Fovea localization regression tests
-│   ├── test_matching.py                # Biometric Delaunay matching unit tests
-│   ├── test_postprocess.py             # Morphological post-processing tests
-│   ├── test_week1_and_week2.py         # Dataset loading & architecture verification tests
-│   └── test_week3_and_week4.py         # Advanced training & loss calculation tests
-├── web/                                # Next.js 16 App Router WebGL Studio Frontend
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── layout.tsx              # Root clinical layout & font setup
-│   │   │   ├── page.tsx                # 3-Stage clinical dashboard & cohort studio
-│   │   │   └── globals.css             # Tailwind CSS & dark theme styling
-│   │   ├── components/
-│   │   │   ├── DelaunayConstellation.tsx # 3D dual-disc constellation with laser beams
-│   │   │   └── RetinalGlobe.tsx        # 3D spherical fundus globe with GLSL shader
-│   │   ├── lib/
-│   │   │   └── api.ts                  # Type-safe HTTP client connecting to FastAPI
-│   │   └── types/
-│   │       └── biometrics.ts           # Shared TypeScript interfaces & biometric contracts
-│   ├── package.json                    # Frontend package dependencies (Next 16, Three.js)
-│   ├── tsconfig.json                   # Strict TypeScript compiler configuration
-│   └── next.config.ts                  # Next.js configuration with Turbopack support
-├── ROADMAP.md                          # Milestone progress & Capstone II roadmap
-└── README.md                           # Master project documentation (this file)
+├── api/                               # FastAPI 2.0 Enterprise Backend
+│   ├── main.py                        # REST routing, CORS, Decompression Bomb Guards
+│   ├── schemas.py                     # Pydantic v2 data contracts with strict range bounds
+│   └── services.py                    # Pipeline orchestration and 11-param degradation engine
+├── classical_pipeline/                # Anatomical Landmark Localization Subsystem
+│   ├── __init__.py
+│   ├── bezier_matched_filter.py       # Bézier curve matched filter baseline (Kanjanasurat 2020)
+│   ├── fovea_localization.py          # Optic disc hemispheric sign (od_x < W/2), OD-anchored anisotropic Gaussian prior and macular darkness
+│   ├── localization.py                # Legacy coordinate transform stubs (raises NotImplementedError)
+│   ├── localization_api.py            # Unified landmark extraction interface
+│   ├── localization_api_sanity_checks.py # Sanity verification suite for landmark localization
+│   ├── optic_disc_localization.py     # Multi-cue density, structure-tensor tangent ray voting, and pale hue fusion
+│   └── skeleton_metrics.py            # Topological skeleton quality analysis and short spur pruning
+├── dl_pipeline/                       # Deep Learning Perception Subsystem
+│   ├── __init__.py
+│   ├── data_utils.py                  # Multi-dataset sample discovery and multi-format image/mask loaders
+│   ├── dataset.py                     # U-Net dataset loader with Albumentations augmentations
+│   ├── model.py                       # ResNet-34 U-Net network architecture
+│   ├── postprocess.py                 # Morphological connected component noise filtering and binary hole filling
+│   ├── predict.py                     # TTA-augmented batch/single inference
+│   └── train.py                       # Tripartite loss trainer (BCE + Dice + clDice)
+├── evaluation/                        # Empirical Benchmark and Metric Evaluation Suite
+│   ├── __init__.py
+│   ├── compare_models.py              # Comparative performance benchmarks across checkpoints
+│   ├── evaluate_localization.py       # IDRiD landmark detection accuracy and error radii
+│   ├── evaluate_matching.py           # Verification ROC/DET curves and EER metrics
+│   ├── evaluate_vessel.py             # Vessel segmentation benchmark runner (DRIVE, STARE, HRF)
+│   ├── metrics.py                     # Standardized evaluation metrics (Dice, Sensitivity, Specificity, Accuracy, ROC-AUC)
+│   └── threshold_analysis.py          # Adaptive binarization threshold sweep engine
+├── matching/                          # Biometric Matching Engine
+│   ├── __init__.py
+│   ├── bifurcation.py                 # Rutovitz Crossing Number minutiae extraction
+│   ├── matcher.py                     # Kabsch SVD alignment and induced subgraph matching
+│   ├── skeleton.py                    # Zhang-Suen and Lee medial axis thinning with spur pruning
+│   └── triangulation.py               # Delaunay triangulation and invariant geometry
+├── results/                           # Quantitative Benchmark Reports and Visual Artifacts
+│   ├── fovea/                         # Fovea localization hyperparameters
+│   │   └── best_config.json
+│   ├── localization/                  # Landmark localization evaluation reports and CSVs
+│   │   ├── idrid_localization_results.csv
+│   │   └── localization_evaluation_report.md
+│   ├── matching/                      # Biometric matching reports, ROC curves, and scores
+│   │   ├── biometric_matching_curves.png
+│   │   ├── matching_evaluation_report.md
+│   │   └── matching_score_records.csv
+│   ├── optic_disc/                    # Optic disc localization hyperparameters
+│   │   └── best_config.json
+│   ├── threshold_optimization_curves.png # Adaptive threshold parameter sweep visualization
+│   ├── threshold_optimization_report.md   # Adaptive thresholding sweep results
+│   ├── threshold_optimization_results.csv # Binarization parameter grid search records
+│   ├── training_curves.png            # Initial multi-dataset U-Net training convergence curve
+│   ├── training_curves_v2.png         # Production Soft-clDice U-Net v3 training convergence curve
+│   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
+├── tests/                             # Automated Pytest Suite (40 unit & integration tests)
+│   ├── __init__.py
+│   ├── test_api.py                    # REST endpoint and schema validation tests
+│   ├── test_bezier_matched_filter.py  # Bézier curve matched filter baseline tests
+│   ├── test_codebase_integrity.py     # AST syntax, unused-import, zero-emoji, and comment-policy verification
+│   ├── test_localization_api.py       # Optic disc and fovea localization tests
+│   ├── test_matching.py               # Zhang-Suen, Lee, Rutovitz, and Delaunay matching tests
+│   ├── test_postprocess.py            # Connected-component noise removal and binary hole filling tests
+│   ├── test_week1_and_week2.py        # Dataset loading and metric validation tests
+│   └── test_week3_and_week4.py        # U-Net forward pass, loss, and early stopping tests
+├── web/                               # Next.js 16 WebGL 3D Studio Frontend
+│   ├── .gitignore
+│   ├── README.md
+│   ├── eslint.config.mjs
+│   ├── next.config.ts
+│   ├── package-lock.json
+│   ├── package.json                   # Dependencies (Next 16.4.2, React 19, Three.js, Lucide)
+│   ├── tsconfig.json
+│   └── src/
+│       ├── app/
+│       │   ├── favicon.ico
+│       │   ├── globals.css            # Medical typography, grid layouts, and color tokens
+│       │   ├── layout.tsx             # Root layout with Geist Mono font and metadata
+│       │   └── page.tsx               # 3-Stage Studio (Globe, Matcher, Cohort Matrix)
+│       ├── components/
+│       │   ├── DelaunayConstellation.tsx  # 3D Three.js WebGL dual-plane constellation & laser viewer
+│       │   └── RetinalGlobe.tsx       # 3D Three.js sphere with GLSL depth shader
+│       ├── lib/
+│       │   └── api.ts                 # Type-safe fetch client and preset definitions
+│       └── types/
+│           └── biometrics.ts          # TypeScript interfaces matching backend Pydantic models
+├── .gitignore                         # Git exclusion rules for large models, data, and secrets
+├── README.md                          # Comprehensive project documentation and benchmark report
+└── requirements.txt                   # Complete Python dependencies (Core, DL, FastAPI, Pytest)
 ```
 
 ---
 
-## 6. The 3-Stage Interactive WebGL Clinical Studio (`web/`)
+## 6. Installation, Configuration, and Usage
 
-The web interface is engineered as an interactive 3D clinical workstation with three unified stages:
+### Prerequisites
+- Python 3.10, 3.11, or 3.12 (64-bit)
+- Node.js 18.17+ or Node.js 20+
+- Recommended: CUDA-capable GPU (CPU fallback fully supported)
 
-```
-[VERA | VASCULAR EXTRACTION & RETINAL AUTHENTICATION]
-├── [01 3D ANATOMY]    -> Spherical Retinal Globe with Volumetric Vessel Shader
-├── [02 IDENTITY MATCH]-> Dual-Disc Delaunay Graph with Real-Time Lasers & Perturbations
-└── [03 COHORT MATRIX] -> 4x4 Confusion Matrix, Stress Vectors & Live Telemetry
-```
+### 6.1 Backend Setup
+1. Clone the repository and initialize the Python virtual environment:
+   ```powershell
+   git clone https://github.com/swnst/retinal-vascular.git
+   cd retinal-vascular
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
+2. Verify model weight availability:
+   The production checkpoint `best_unet_model_v3.pth` (93.39 MB) should reside in `models/`.
+3. Run the automated test suite:
+   ```powershell
+   pytest tests/ -v
+   ```
+   *Expected outcome: 40 passed in ~17s.*
+4. Start the FastAPI backend server:
+   ```powershell
+   uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+   Interactive Swagger documentation is available at `http://localhost:8000/docs`.
 
-### 6.1 Stage 01: 3D Ocular Anatomy (`01 3D Anatomy`)
-- **Spherical Retinal Globe**: Maps fundus photography onto an anatomically contoured ocular cup ($z = -0.42 \cdot (1 - r^2)$).
-- **Custom GLSL Vessel Depth Shader**: Displaces vertices in real-time along normal vectors based on the neural vessel probability map, rendering extruded 3D relief vasculature.
-- **Continuous 60FPS Probability Thresholding**: Dynamic slider adjusts the threshold cutoff in real-time within the WebGL shader without re-running neural network inference.
-- **Exploded Layer Toggle**: Separates the neural vessel network from the fundus base disc in 3D space with dedicated neon cyan illumination.
-- **3D Landmark Beacons**: Renders glowing 3D beacon pins directly at the localized coordinates of the Optic Disc and Fovea Centralis.
+### 6.2 Frontend Setup
+1. Navigate to the web workspace and install dependencies:
+   ```powershell
+   cd web
+   npm install
+   ```
+2. Run type-checking and linter:
+   ```powershell
+   npm run lint
+   npx tsc --noEmit
+   ```
+3. Start the Next.js development server:
+   ```powershell
+   npm run dev
+   ```
+   Access the web studio at `http://localhost:3000`.
 
-### 6.2 Stage 02: 1-to-1 Biometric Identity Matcher (`02 Identity Match`)
-- **Dual 3D Retinal Discs**: Renders Reference Eye (A) in electric cyan and Target Eye (B) in deep rose.
-- **Real-Time Hungarian Laser Beams**: Verified matched triangle pairs connect across 3D space with glowing laser correspondence lines.
-- **Emerald Green Invariant Highlighting**: 100% of verified matched triangles (both initial seeds and induced common-subgraph triangles) highlight in emerald green (`#10b981`).
-- **11-Parameter Perturbation Suite**: Interactive sliders controlling head tilt ($\pm 45^\circ$), working distance ($0.80\text{x}$ to $1.20\text{x}$), cataract haze, corneal glare, defocus blur, sensor ISO noise, eyelid occlusion, ISP gamma, spherical gaze warp, and pulsatile IOP elastic displacement.
-- **8 One-Click Stress Preset Chips**: Instantly loads calibrated clinical scenarios including Clean Baseline, Cataract, Corneal Glare, Defocus Blur, ISO Noise, and the combined 7-parameter `Judge Torture`.
+### 6.3 REST API Endpoints
 
-### 6.3 Stage 03: Population Cohort Matrix (`03 Cohort Matrix`)
-- **4x4 Cross-Subject Confusion Heatmap Matrix**: Evaluates multi-subject pairings across Subject 01 (Normal), Subject 02 (Impostor), Subject 23 (Sparse Vascular Tree), and Subject 24 (Dense Vascular Tree).
-- **Toggleable Regimes**: Instantly switches between `Clean Baseline` (100% genuine verification, 0.0% impostor) and `Judge Torture` (all genuine subjects maintain verified identity).
-- **8-Vector Stress Resilience Bars**: Real-time progress bars displaying the degradation curve across all 8 stress vectors.
-- **One-Click Drill-Down Navigation**: Clicking any matrix cell loads that exact pair into Stage 02 with the corresponding stress parameters applied for deep forensic inspection.
-- **Live Verification Telemetry**: The `Run Live Cohort Verification` action computes all 16 matrix cells in real-time against the live backend, measuring per-pair inference latency and triangle counts.
-
----
-
-## 7. Getting Started
-
-### 7.1 Prerequisites
-- **Python**: Version 3.10 to 3.12 (64-bit)
-- **Node.js**: Version 18.18 or higher (LTS recommended)
-- **Git**: Version 2.30+
-- **CUDA (Optional)**: CUDA 11.8 or 12.x for accelerated GPU training and inference
-
-### 7.2 Backend Installation & Startup
-```bash
-# Clone the repository
-git clone https://github.com/swnst/retinal-vascular.git
-cd retinal-vascular
-
-# Create and activate virtual environment
-python -m venv .venv
-
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# On Linux / macOS:
-source .venv/bin/activate
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Start the FastAPI 2.0 Backend Server
-uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
-```
-The REST API documentation will be available at `http://127.0.0.1:8000/docs`.
-
-### 7.3 Frontend Installation & Startup
-Open a separate terminal window:
-```bash
-# Navigate to the frontend directory
-cd retinal-vascular/web
-
-# Install Node dependencies
-npm install
-
-# Start the Next.js Turbopack development server
-npm run dev
-```
-Open your browser at `http://localhost:3000` to launch the 3D WebGL Clinical Studio.
-
-### 7.4 Running Automated Verification Suite
-From the repository root with `.venv` active:
-```bash
-# Run all 29 automated tests
-pytest tests/ -v
-
-# Run frontend linting & strict TypeScript check
-cd web
-npm run lint
-npx tsc --noEmit
-
-# Run production build
-npm run build
-```
+- `GET /api/v1/health`: Heartbeat endpoint verifying backend service readiness and model availability.
+- `GET /api/v1/presets`: Returns available clinical stress presets and pre-cached verification pairs across nominal and perturbed scenarios.
+- `POST /api/v1/segment`: Ingests a base64 fundus image, executes ResNet-34 U-Net perception with TTA, computes adaptive binarization, and returns vessel probability maps, binary masks, and skeleton representations.
+- `POST /api/v1/localize`: Detects Optic Disc and Fovea Centralis coordinates, disk-to-fovea distance, and processing time.
+- `POST /api/v1/match`: Accepts reference and target fundus scans along with 11 perturbation parameters. Executes segmentation, landmark extraction, Kabsch SVD alignment, and Delaunay induced subgraph matching, returning decision metrics and laser correspondence coordinates.
 
 ---
 
-## 8. Quality Gate & Production Readiness
+## 7. Citation and Academic Attribution
 
-The VERA codebase adheres to zero-trust production quality standards:
-
-- **Automated Tests**: **29 of 29 tests passed** (`pytest tests/`) covering API contracts, Pydantic bounds, localization algorithms, morphological post-processing, and Delaunay invariant matching.
-- **Code Quality**: **0 ESLint errors and 0 warnings** under strict Next.js and TypeScript configurations.
-- **Type Safety**: Fully typed with strict TypeScript and Python type annotations (no untyped `any` casting).
-- **Security Safeguards**: Image payload size guards ($4096 \times 4096\text{ px}$ decompression limit), strict CORS policies (`allow_credentials=False` for wildcard origins), and zero hardcoded secrets.
-- **Memory Hygiene**: WebGL geometries, shaders, and textures are explicitly disposed of on component unmount to prevent GPU VRAM memory leaks.
-
----
-
-## 9. Academic Citations & Acknowledgments
-
-If you utilize this codebase, models, or biometric matching algorithms in academic research, please cite:
+If you utilize the VERA platform, codebase, or mathematical models in your research, cite as:
 
 ```bibtex
-@article{kanjanasurat2020personal,
-  title={Personal Identification Using a Delaunay Triangle and Optic Disc Retinal Vascular Pattern},
-  author={Kanjanasurat, Isoon and Satayarak, Nitjaree and others},
-  journal={Journal of Healthcare Engineering},
-  volume={2020},
-  year={2020},
-  publisher={Hindawi}
-}
-
-@misc{vera_biometrics_2026,
-  title={VERA: Vascular Extraction & Retinal Authentication Platform},
-  author={Dawit and Viwat and Kanjanasurat, Isoon and Satayarak, Nitjaree},
-  year={2026},
-  howpublished={\url{https://github.com/swnst/retinal-vascular}}
+@misc{suwannasit2026vera,
+  author       = {Wiwat Suwannasit and Dvis Vichitlaksana},
+  title        = {VERA: Vascular Extraction and Retinal Authentication Platform},
+  howpublished = {Senior Capstone Project, Department of IoT and Information Engineering, School of Engineering, King Mongkut's Institute of Technology Ladkrabang},
+  year         = {2026},
+  note         = {Supervised by Asst. Prof. Isoon Kanjanasurat and Asst. Prof. Dr. Nitjaree Satayarak}
 }
 ```

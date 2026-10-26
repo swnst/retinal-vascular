@@ -102,6 +102,9 @@ def predict_vessel_mask(
             img_np = np.stack([image] * 3, axis=-1)
         elif image.ndim == 3 and image.shape[2] == 1:
             img_np = np.repeat(image, 3, axis=2)
+        elif image.ndim == 3 and image.shape[2] == 4:
+            alpha = image[:, :, 3:4].astype(np.float32) / 255.0
+            img_np = np.clip(image[:, :, :3].astype(np.float32) * alpha, 0, 255).astype(np.uint8)
         else:
             img_np = image.copy()
     else:
@@ -109,7 +112,8 @@ def predict_vessel_mask(
 
     orig_h, orig_w = img_np.shape[:2]
 
-    resized_img = cv2.resize(img_np, (img_size, img_size), interpolation=cv2.INTER_LINEAR)
+    interp_down = cv2.INTER_AREA if max(orig_h, orig_w) > 1024 else cv2.INTER_LINEAR
+    resized_img = cv2.resize(img_np, (img_size, img_size), interpolation=interp_down)
     tensor_in = torch.from_numpy(resized_img.astype(np.float32) / 255.0).permute(2, 0, 1).unsqueeze(0).to(device_obj)
 
     with torch.no_grad():

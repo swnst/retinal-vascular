@@ -18,6 +18,7 @@ interface RetinalGlobeProps {
   explodedLayers?: boolean;
   imageWidth?: number;
   imageHeight?: number;
+  inspectorOpen?: boolean;
 }
 
 // --- AAA 3D Concave Ocular Fundus Cup with Dynamic Camera Control Dock ---
@@ -34,6 +35,7 @@ export default function RetinalGlobe({
   explodedLayers = false,
   imageWidth = 565,
   imageHeight = 584,
+  inspectorOpen = false,
 }: RetinalGlobeProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const ocularGroupRef = useRef<THREE.Group | null>(null);
@@ -316,11 +318,11 @@ export default function RetinalGlobe({
 
     // --- Controlled 60FPS Render Loop ---
     let animId: number;
-    const clock = new THREE.Clock();
+    const startTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
+      const elapsed = (performance.now() - startTime) * 0.001;
 
       if (customMaterial) {
         customMaterial.uniforms.uTime.value = elapsed;
@@ -369,8 +371,15 @@ export default function RetinalGlobe({
       domElement.removeEventListener("wheel", onWheel);
       resizeObserver.disconnect();
       domElement.remove();
+      if (customMaterial) {
+        customMaterial.uniforms.tFundus.value?.dispose();
+        customMaterial.uniforms.tProbMap.value?.dispose();
+      }
+      if (skelMaterial) {
+        skelMaterial.uniforms.tSkeleton.value?.dispose();
+      }
       scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points) {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Points || obj instanceof THREE.Line) {
           obj.geometry?.dispose();
           if (Array.isArray(obj.material)) {
             obj.material.forEach((m) => m.dispose());
@@ -389,17 +398,30 @@ export default function RetinalGlobe({
     const loader = new THREE.TextureLoader();
 
     if (fundusImageBase64) {
-      loader.load(fundusImageBase64, (tex) => {
-        if (!materialRef.current) return;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        if (materialRef.current.uniforms.tFundus.value) {
-          materialRef.current.uniforms.tFundus.value.dispose();
+      loader.load(
+        fundusImageBase64,
+        (tex) => {
+          if (!materialRef.current) return;
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          if (materialRef.current.uniforms.tFundus.value) {
+            materialRef.current.uniforms.tFundus.value.dispose();
+          }
+          materialRef.current.uniforms.tFundus.value = tex;
+          materialRef.current.uniforms.hasFundus.value = 1.0;
+          materialRef.current.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          if (!materialRef.current) return;
+          if (materialRef.current.uniforms.tFundus.value) {
+            materialRef.current.uniforms.tFundus.value.dispose();
+            materialRef.current.uniforms.tFundus.value = null;
+          }
+          materialRef.current.uniforms.hasFundus.value = 0.0;
+          materialRef.current.needsUpdate = true;
         }
-        materialRef.current.uniforms.tFundus.value = tex;
-        materialRef.current.uniforms.hasFundus.value = 1.0;
-        materialRef.current.needsUpdate = true;
-      });
+      );
     } else {
       if (materialRef.current.uniforms.tFundus.value) {
         materialRef.current.uniforms.tFundus.value.dispose();
@@ -409,17 +431,30 @@ export default function RetinalGlobe({
     }
 
     if (probMapBase64) {
-      loader.load(probMapBase64, (tex) => {
-        if (!materialRef.current) return;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        if (materialRef.current.uniforms.tProbMap.value) {
-          materialRef.current.uniforms.tProbMap.value.dispose();
+      loader.load(
+        probMapBase64,
+        (tex) => {
+          if (!materialRef.current) return;
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          if (materialRef.current.uniforms.tProbMap.value) {
+            materialRef.current.uniforms.tProbMap.value.dispose();
+          }
+          materialRef.current.uniforms.tProbMap.value = tex;
+          materialRef.current.uniforms.hasProbMap.value = 1.0;
+          materialRef.current.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          if (!materialRef.current) return;
+          if (materialRef.current.uniforms.tProbMap.value) {
+            materialRef.current.uniforms.tProbMap.value.dispose();
+            materialRef.current.uniforms.tProbMap.value = null;
+          }
+          materialRef.current.uniforms.hasProbMap.value = 0.0;
+          materialRef.current.needsUpdate = true;
         }
-        materialRef.current.uniforms.tProbMap.value = tex;
-        materialRef.current.uniforms.hasProbMap.value = 1.0;
-        materialRef.current.needsUpdate = true;
-      });
+      );
     } else {
       if (materialRef.current.uniforms.tProbMap.value) {
         materialRef.current.uniforms.tProbMap.value.dispose();
@@ -429,17 +464,37 @@ export default function RetinalGlobe({
     }
 
     if (skeletonBase64 && skelMaterialRef.current) {
-      loader.load(skeletonBase64, (tex) => {
-        if (!skelMaterialRef.current) return;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        if (skelMaterialRef.current.uniforms.tSkeleton.value) {
-          skelMaterialRef.current.uniforms.tSkeleton.value.dispose();
+      loader.load(
+        skeletonBase64,
+        (tex) => {
+          if (!skelMaterialRef.current) return;
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          if (skelMaterialRef.current.uniforms.tSkeleton.value) {
+            skelMaterialRef.current.uniforms.tSkeleton.value.dispose();
+          }
+          skelMaterialRef.current.uniforms.tSkeleton.value = tex;
+          skelMaterialRef.current.uniforms.hasSkeleton.value = 1.0;
+          skelMaterialRef.current.needsUpdate = true;
+        },
+        undefined,
+        () => {
+          if (!skelMaterialRef.current) return;
+          if (skelMaterialRef.current.uniforms.tSkeleton.value) {
+            skelMaterialRef.current.uniforms.tSkeleton.value.dispose();
+            skelMaterialRef.current.uniforms.tSkeleton.value = null;
+          }
+          skelMaterialRef.current.uniforms.hasSkeleton.value = 0.0;
+          skelMaterialRef.current.needsUpdate = true;
         }
-        skelMaterialRef.current.uniforms.tSkeleton.value = tex;
-        skelMaterialRef.current.uniforms.hasSkeleton.value = 1.0;
-        skelMaterialRef.current.needsUpdate = true;
-      });
+      );
+    } else if (skelMaterialRef.current) {
+      if (skelMaterialRef.current.uniforms.tSkeleton.value) {
+        skelMaterialRef.current.uniforms.tSkeleton.value.dispose();
+        skelMaterialRef.current.uniforms.tSkeleton.value = null;
+      }
+      skelMaterialRef.current.uniforms.hasSkeleton.value = 0.0;
+      skelMaterialRef.current.needsUpdate = true;
     }
   }, [fundusImageBase64, probMapBase64, skeletonBase64]);
 
@@ -461,7 +516,13 @@ export default function RetinalGlobe({
     if (!beaconGroupRef.current) return;
     const group = beaconGroupRef.current;
     while (group.children.length > 0) {
-      group.remove(group.children[0]);
+      const child = group.children[0];
+      if (child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.Line) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+        else child.material?.dispose();
+      }
+      group.remove(child);
     }
 
     if (!showLandmarks) return;
@@ -547,7 +608,7 @@ export default function RetinalGlobe({
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Floating 3D Camera & Rotation Control Dock (Bottom Center) */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center space-x-2 bg-gray-950/85 backdrop-blur-xl px-4 py-2 rounded-2xl border border-gray-800/80 shadow-2xl text-xs font-mono">
+      <div className={`absolute ${inspectorOpen ? "bottom-56" : "bottom-5"} transition-all duration-300 left-1/2 -translate-x-1/2 z-20 flex items-center space-x-2 bg-gray-950/85 backdrop-blur-xl px-4 py-2 rounded-2xl border border-gray-800/80 shadow-2xl text-xs font-mono`}>
         <button
           onClick={() => setIsAutoRotating(!isAutoRotating)}
           className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${

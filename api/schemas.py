@@ -116,3 +116,19 @@ class PresetItem(BaseModel):
     image_base64: str
     image_b_base64: str | None = None
     thumbnail_base64: str
+
+
+# --- Image Normalization Models ---
+class NormalizeImageRequest(BaseModel):
+    image_base64: str = Field(..., description="Base64 encoded clinical fundus image in any format")
+    max_dim: int = Field(768, ge=128, le=2048, description="Maximum output dimension preserving aspect ratio")
+
+
+class NormalizeImageResponse(BaseModel):
+    image_base64: str
+    width: int
+    height: int
+    original_width: int
+    original_height: int
+    filename: str = ""
+

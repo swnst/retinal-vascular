@@ -96,3 +96,13 @@ export interface MatchResult {
   perturbed_image_b_base64?: string;
   elapsed_ms: number;
 }
+
+export interface NormalizedImageResult {
+  image_base64: string;
+  width: number;
+  height: number;
+  original_width: number;
+  original_height: number;
+  filename: string;
+}
+

@@ -79,6 +79,19 @@ def match_templates_detailed(
     kps_a = np.asarray(template_a.get("keypoints", []), dtype=np.float64)
     kps_b = np.asarray(template_b.get("keypoints", []), dtype=np.float64)
 
+    if len(kps_a) > 220:
+        center_a = np.mean(kps_a, axis=0)
+        dists_a = np.linalg.norm(kps_a - center_a, axis=1)
+        sort_idx_a = np.argsort(dists_a)
+        stride_idx = np.linspace(0, len(kps_a) - 1, 220, dtype=int)
+        kps_a = kps_a[sort_idx_a[stride_idx]]
+    if len(kps_b) > 220:
+        center_b = np.mean(kps_b, axis=0)
+        dists_b = np.linalg.norm(kps_b - center_b, axis=1)
+        sort_idx_b = np.argsort(dists_b)
+        stride_idx = np.linspace(0, len(kps_b) - 1, 220, dtype=int)
+        kps_b = kps_b[sort_idx_b[stride_idx]]
+
     len_a = len(invariants_a)
     len_b = len(invariants_b)
     if (len_a == 0 or len_b == 0) and (len(kps_a) < 4 or len(kps_b) < 4):
@@ -250,7 +263,8 @@ def match_templates_detailed(
                     Vt[-1, :] *= -1
                     R_opt = Vt.T @ U.T
                 th_opt = math.atan2(R_opt[1, 0], R_opt[0, 0])
-                if abs(th_opt) <= math.radians(55.0):
+                is_angle_consistent = abs(((th_opt - th0 + math.pi) % (2.0 * math.pi)) - math.pi) <= math.radians(25.0)
+                if is_angle_consistent:
                     pred_opt = mean_b + (kps_a - mean_a) @ R_opt.T
                     dists2, idxs2 = kp_tree_b.query(pred_opt, distance_upper_bound=kp_tol)
                     valid2 = np.isfinite(dists2)
@@ -282,7 +296,8 @@ def match_templates_detailed(
 
     if min_kps >= 9:
         is_valid_consensus = best_model is not None and (
-            kp_inlier_count >= 13 or (kp_inlier_count >= 9 and kp_inlier_ratio >= 0.38)
+            (kp_inlier_count >= 13 and kp_inlier_ratio >= 0.16)
+            or (kp_inlier_count >= 9 and kp_inlier_ratio >= 0.38)
         )
     else:
         is_valid_consensus = best_model is not None and (

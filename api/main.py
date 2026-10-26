@@ -1,5 +1,6 @@
+import base64
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
@@ -9,6 +10,8 @@ from api.schemas import (
     LocalizationResponse,
     MatchRequest,
     MatchResponse,
+    NormalizeImageRequest,
+    NormalizeImageResponse,
     PresetItem,
     SegmentationRequest,
     SegmentationResponse,
@@ -286,6 +289,39 @@ def match_endpoint(req: MatchRequest):
             elastic_alpha_b=req.elastic_alpha_b,
         )
         return MatchResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/upload-image", response_model=NormalizeImageResponse)
+async def upload_image_endpoint(
+    file: UploadFile = File(...),
+    max_dim: int = Form(768),
+):
+    try:
+        if max_dim < 128 or max_dim > 2048:
+            raise ValueError("max_dim must be between 128 and 2048.")
+        raw_bytes = await file.read()
+        result = pipeline_service.normalize_image_for_studio(
+            raw_bytes=raw_bytes,
+            max_dim=max_dim,
+            filename=file.filename or "uploaded_scan",
+        )
+        return NormalizeImageResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/v1/normalize-image", response_model=NormalizeImageResponse)
+def normalize_image_endpoint(req: NormalizeImageRequest):
+    try:
+        b64_payload = req.image_base64.split(",", 1)[1] if "," in req.image_base64 else req.image_base64
+        raw_bytes = base64.b64decode(b64_payload)
+        result = pipeline_service.normalize_image_for_studio(
+            raw_bytes=raw_bytes,
+            max_dim=req.max_dim,
+        )
+        return NormalizeImageResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

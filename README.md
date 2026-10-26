@@ -241,7 +241,7 @@ Evaluated using the live production `PipelineService` on DRIVE reference Subject
 | **Low-Light Sensor Noise** | ISO noise $\sigma = 16.0$, brightness $0.85$ | 62 pairs | **72.7%** (0.7271) | 0.00% | 0.00% | Genuine Verified |
 | **Eyelid Occlusion** | Palpebral eyelid occlusion $22\%$ (65% superior / 35% inferior) | 81 pairs | **86.4%** (0.8641) | 0.00% | 0.00% | Genuine Verified |
 | **Multi-Factor Judge Torture** | 7 stressors: Tilt $+15^\circ$, Scale $0.90\text{x}$, Haze $0.30$, Blur $\sigma=1.8$, Noise $\sigma=10$, Glare $0.35$, Elastic $\alpha=2.0$ | 51 pairs | **63.4%** (0.6343) | 0.00% | 0.00% | **Genuine Verified** (threshold: 20.0%) |
-| **Cross-Subject Impostor Cohort** | 12 off-diagonal pairs across `S01, S02, S23, S24` | 0 pairs | **0.0%** (0.0000) | **0.00%** | N/A | **Impostors Rejected** |
+| **Cross-Subject Impostor Cohort** | 12 off-diagonal pairs across `S01, S02, S23, S24` (Clean Baseline: 0.0%, 0 pairs; 7-param Torture: max 12.8% on `S24` vs `S02` < 20.0%) | 0 pairs | **0.0%** (0.0000) | **0.00%** | N/A | **Impostors Rejected** |
 
 ---
 
@@ -302,7 +302,7 @@ retinal-vascular/
 │   ├── training_curves.png            # Initial multi-dataset U-Net training convergence curve
 │   ├── training_curves_v2.png         # Production Soft-clDice U-Net v3 training convergence curve
 │   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
-├── tests/                             # Automated Pytest Suite (40 unit & integration tests)
+├── tests/                             # Automated Pytest Suite (46 unit & integration tests)
 │   ├── __init__.py
 │   ├── test_api.py                    # REST endpoint and schema validation tests
 │   ├── test_bezier_matched_filter.py  # Bézier curve matched filter baseline tests
@@ -362,7 +362,7 @@ retinal-vascular/
    ```powershell
    pytest tests/ -v
    ```
-   *Expected outcome: 40 passed in ~17s.*
+   *Expected outcome: 46 passed in ~28s.*
 4. Start the FastAPI backend server:
    ```powershell
    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
@@ -390,6 +390,8 @@ retinal-vascular/
 
 - `GET /api/v1/health`: Heartbeat endpoint verifying backend service readiness and model availability.
 - `GET /api/v1/presets`: Returns available clinical stress presets and pre-cached verification pairs across nominal and perturbed scenarios.
+- `POST /api/v1/upload-image`: Multipart form file upload accepting any clinical fundus format (.tif, .tiff, .ppm, .pgm, .bmp, .gif, .webp, PNG, JPEG, 16-bit, RGBA) and high resolutions (up to 64MP), returning browser-safe normalized 8-bit RGB PNG base64.
+- `POST /api/v1/normalize-image`: JSON endpoint accepting arbitrary base64-encoded clinical fundus images and returning browser-safe normalized 8-bit RGB PNG base64.
 - `POST /api/v1/segment`: Ingests a base64 fundus image, executes ResNet-34 U-Net perception with TTA, computes adaptive binarization, and returns vessel probability maps, binary masks, and skeleton representations.
 - `POST /api/v1/localize`: Detects Optic Disc and Fovea Centralis coordinates, disk-to-fovea distance, and processing time.
 - `POST /api/v1/match`: Accepts reference and target fundus scans along with 11 perturbation parameters. Executes segmentation, landmark extraction, Kabsch SVD alignment, and Delaunay induced subgraph matching, returning decision metrics and laser correspondence coordinates.

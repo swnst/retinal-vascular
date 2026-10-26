@@ -1,12 +1,13 @@
 import {
   LocalizationResult,
   MatchResult,
+  NormalizedImageResult,
   PerturbationParams,
   PresetItem,
   SegmentationResult,
 } from "@/types/biometrics";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // --- API Client Handlers ---
 export async function fetchHealth(): Promise<{ status: string; device: string; model_loaded: boolean }> {
@@ -110,3 +111,20 @@ export async function requestMatch(
   }
   return res.json();
 }
+
+export async function uploadClinicalImage(file: File, maxDim: number = 768): Promise<NormalizedImageResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("max_dim", maxDim.toString());
+
+  const res = await fetch(`${API_BASE}/api/v1/upload-image`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Image upload failed" }));
+    throw new Error(err.detail || "Image upload failed");
+  }
+  return res.json();
+}
+

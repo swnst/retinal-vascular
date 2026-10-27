@@ -238,7 +238,7 @@ Evaluated using the live production `PipelineService` on DRIVE reference Subject
 | **Cataract Media Haze** | Haze $h = 0.45$, gamma $0.85$ | 86 pairs | **86.4%** (0.8644) | 0.00% | 0.00% | Genuine Verified |
 | **Corneal Surface Glare** | Glare intensity $0.65$, brightness $0.80$ | 84 pairs | **86.7%** (0.8667) | 0.00% | 0.00% | Genuine Verified |
 | **Optical Defocus Blur** | Gaussian blur $\sigma = 2.5$ px | 70 pairs | **82.7%** (0.8266) | 0.00% | 0.00% | Genuine Verified |
-| **Low-Light Sensor Noise** | ISO noise $\sigma = 16.0$, brightness $0.85$ | 62 pairs | **72.7%** (0.7271) | 0.00% | 0.00% | Genuine Verified |
+| **Low-Light Sensor Noise** | ISO noise $\sigma = 16.0$, brightness $0.85$ | 64 pairs | **74.0%** (0.7403) | 0.00% | 0.00% | Genuine Verified |
 | **Eyelid Occlusion** | Palpebral eyelid occlusion $22\%$ (65% superior / 35% inferior) | 81 pairs | **86.4%** (0.8641) | 0.00% | 0.00% | Genuine Verified |
 | **Multi-Factor Judge Torture** | 7 stressors: Tilt $+15^\circ$, Scale $0.90\text{x}$, Haze $0.30$, Blur $\sigma=1.8$, Noise $\sigma=10$, Glare $0.35$, Elastic $\alpha=2.0$ | 51 pairs | **63.4%** (0.6343) | 0.00% | 0.00% | **Genuine Verified** (threshold: 20.0%) |
 | **Cross-Subject Impostor Cohort** | 12 off-diagonal pairs across `S01, S02, S23, S24` (Clean Baseline: 0.0%, 0 pairs; 7-param Torture: max 12.8% on `S24` vs `S02` < 20.0%) | 0 pairs | **0.0%** (0.0000) | **0.00%** | N/A | **Impostors Rejected** |
@@ -302,7 +302,7 @@ retinal-vascular/
 │   ├── training_curves.png            # Initial multi-dataset U-Net training convergence curve
 │   ├── training_curves_v2.png         # Production Soft-clDice U-Net v3 training convergence curve
 │   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
-├── tests/                             # Automated Pytest Suite (46 unit & integration tests)
+├── tests/                             # Automated Pytest Suite (47 unit & integration tests)
 │   ├── __init__.py
 │   ├── test_api.py                    # REST endpoint and schema validation tests
 │   ├── test_bezier_matched_filter.py  # Bézier curve matched filter baseline tests
@@ -362,7 +362,7 @@ retinal-vascular/
    ```powershell
    pytest tests/ -v
    ```
-   *Expected outcome: 46 passed in ~28s.*
+   *Expected outcome: 47 passed in ~29s.*
 4. Start the FastAPI backend server:
    ```powershell
    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload

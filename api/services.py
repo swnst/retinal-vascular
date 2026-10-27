@@ -176,49 +176,53 @@ class PipelineService:
 
         # --- Corneal Specular Flash Glare ---
         if glare_intensity > 1e-3:
-            cy, cx = h / 2.0, w / 2.0
-            y_coords, x_coords = np.ogrid[:h, :w]
-            dist_from_center = np.sqrt((x_coords - cx) ** 2 + (y_coords - cy) ** 2)
-            glare_radius = 0.22 * min(h, w)
-            glare_profile = np.exp(-0.5 * (dist_from_center / (glare_radius * 0.45)) ** 2)
-            glare_profile = (glare_profile * glare_intensity * 255.0).astype(np.float32)
-            for c in range(3):
-                out[:, :, c] = np.clip(out[:, :, c] + glare_profile, 0.0, 255.0)
+            y_grid, x_grid = np.indices((h, w), dtype=np.float32)
+            gx, gy = w * 0.45, h * 0.42
+            sigma_g = min(h, w) * 0.14
+            spot = np.exp(-0.5 * (((x_grid - gx) / sigma_g) ** 2 + ((y_grid - gy) / sigma_g) ** 2))
+            glare_bgr = np.stack([spot * 220.0, spot * 240.0, spot * 255.0], axis=-1)
+            out = out + glare_intensity * glare_bgr
 
-        # --- Illumination & Flash Brightness ---
-        if abs(brightness - 1.0) > 1e-3:
-            out = np.clip(out * brightness, 0.0, 255.0)
+        # --- Defocus & Accommodation Blur ---
+        if blur_sigma > 1e-3:
+            ksize = int(2 * round(3 * blur_sigma) + 1)
+            ksize = max(3, ksize if ksize % 2 == 1 else ksize + 1)
+            out = cv2.GaussianBlur(out, (ksize, ksize), sigmaX=blur_sigma, sigmaY=blur_sigma)
 
-        # --- Sensor Thermal / Shot Noise ---
+        # --- CMOS Sensor ISO Noise ---
         if noise_sigma > 1e-3:
             rng = np.random.default_rng(42)
-            noise = rng.normal(0.0, noise_sigma, size=(h, w, 3)).astype(np.float32)
-            out = np.clip(out + noise, 0.0, 255.0)
+            gaussian_noise = rng.normal(0.0, noise_sigma, size=out.shape).astype(np.float32)
+            out = out + gaussian_noise
 
-        # --- Optical Defocus Blur ---
-        if blur_sigma > 1e-3:
-            ksize = int(math.ceil(blur_sigma * 3.0)) * 2 + 1
-            out = cv2.GaussianBlur(out, (ksize, ksize), sigmaX=blur_sigma)
+        # --- Flash Illumination & Brightness ---
+        if abs(brightness - 1.0) > 1e-3:
+            out = out * brightness
 
-        # --- Anatomical Eyelid & Eyelash Occlusion ---
+        # --- Eyelid Occlusion ---
         if occlusion_frac > 1e-3:
-            occ_h = int(h * occlusion_frac)
-            if occ_h > 0:
-                out[:occ_h, :] = 0.0
-                feather = min(20, occ_h)
-                if feather > 1:
-                    ramp = np.linspace(0.0, 1.0, feather).reshape(-1, 1, 1).astype(np.float32)
-                    out[occ_h - feather : occ_h, :] *= ramp
+            ys, _ = np.where(fov)
+            if len(ys) > 0:
+                y_min, y_max = int(np.min(ys)), int(np.max(ys))
+                cut_top = y_min + int((y_max - y_min) * (occlusion_frac * 0.65))
+                cut_bot = y_max - int((y_max - y_min) * (occlusion_frac * 0.35))
+                out[:cut_top, :] = 0
+                out[cut_bot:, :] = 0
 
-        # --- Radial Spherical Distortion ---
+        # --- FOV Aperture Masking ---
+        out = np.clip(out, 0.0, 255.0).astype(np.uint8)
+        out[~fov] = 0
+
+        # --- Spherical Radial Distortion ---
         if abs(spherical_warp) > 1e-3:
             cx, cy = w / 2.0, h / 2.0
             r_max = math.hypot(cx, cy)
-            y_indices, x_indices = np.indices((h, w), dtype=np.float32)
-            dx = x_indices - cx
-            dy = y_indices - cy
-            r_norm = np.sqrt(dx**2 + dy**2) / r_max
-            distortion_factor = 1.0 + spherical_warp * (r_norm**2)
+            y_grid, x_grid = np.indices((h, w), dtype=np.float32)
+            dx = x_grid - cx
+            dy = y_grid - cy
+            r = np.sqrt(dx * dx + dy * dy)
+            r_norm = r / max(r_max, 1.0)
+            distortion_factor = 1.0 + spherical_warp * (r_norm ** 2)
             map_x = (cx + dx * distortion_factor).astype(np.float32)
             map_y = (cy + dy * distortion_factor).astype(np.float32)
             out = cv2.remap(out, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)

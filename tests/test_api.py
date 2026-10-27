@@ -339,3 +339,37 @@ def test_segment_threshold_monotonicity(client):
 
     for i in range(len(densities) - 1):
         assert densities[i] <= densities[i + 1] + 1e-5
+
+
+def test_api_match_perturbation_uint8_and_noise_resilience(client):
+    presets = client.get("/api/v1/presets").json()
+    genuine = next(p for p in presets if p["id"] == "match_genuine_01")
+
+    res_noise = client.post(
+        "/api/v1/match",
+        json={
+            "image_a_base64": genuine["image_base64"],
+            "image_b_base64": genuine["image_b_base64"],
+            "noise_sigma_b": 16.0,
+            "brightness_b": 0.85,
+        },
+    )
+    assert res_noise.status_code == 200
+    data_noise = res_noise.json()
+    assert data_noise["is_match"] is True
+    assert data_noise["similarity_score"] > 0.65
+
+    res_pose = client.post(
+        "/api/v1/match",
+        json={
+            "image_a_base64": genuine["image_base64"],
+            "image_b_base64": genuine["image_b_base64"],
+            "rotate_deg_b": 25.0,
+            "scale_factor_b": 0.85,
+        },
+    )
+    assert res_pose.status_code == 200
+    data_pose = res_pose.json()
+    assert data_pose["is_match"] is True
+    assert data_pose["similarity_score"] > 0.75
+

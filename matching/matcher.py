@@ -92,6 +92,11 @@ def match_templates_detailed(
         stride_idx = np.linspace(0, len(kps_b) - 1, 220, dtype=int)
         kps_b = kps_b[sort_idx_b[stride_idx]]
 
+    if len(invariants_a) > 250:
+        invariants_a = invariants_a[:250]
+    if len(invariants_b) > 250:
+        invariants_b = invariants_b[:250]
+
     len_a = len(invariants_a)
     len_b = len(invariants_b)
     if (len_a == 0 or len_b == 0) and (len(kps_a) < 4 or len(kps_b) < 4):
@@ -104,6 +109,10 @@ def match_templates_detailed(
 
     props_a = [_extract_canonical_props(t) for t in invariants_a]
     props_b = [_extract_canonical_props(t) for t in invariants_b]
+
+    angles_list_b = [t.get("angles", []) for t in invariants_b]
+    area_list_b = [float(t.get("area", 1.0)) for t in invariants_b]
+    ratios_list_b = [t.get("adjacent_ratios", []) for t in invariants_b]
 
     eff_angle_tol = max(angle_tolerance_rad, 0.11)
     eff_ratio_tol = max(ratio_tolerance, 0.10)
@@ -118,24 +127,28 @@ def match_templates_detailed(
             _, chir_a = props_a[i]
             area_a = float(tri_a.get("area", 1.0))
 
-            for j, tri_b in enumerate(invariants_b):
+            for j in range(len_b):
                 _, chir_b = props_b[j]
                 if chir_a != chir_b:
                     continue
-                angles_b = tri_b.get("angles", [])
+                angles_b = angles_list_b[j]
                 if angles_a and angles_b:
-                    angle_diff = sum(abs(angles_a[m] - angles_b[m]) for m in range(3)) / 3.0
+                    angle_diff = (
+                        abs(angles_a[0] - angles_b[0])
+                        + abs(angles_a[1] - angles_b[1])
+                        + abs(angles_a[2] - angles_b[2])
+                    ) / 3.0
                     if angle_diff > eff_angle_tol:
                         continue
                 else:
                     angle_diff = 0.0
 
-                area_b = float(tri_b.get("area", 1.0))
+                area_b = area_list_b[j]
                 area_ratio = min(area_a, area_b) / max(1e-6, max(area_a, area_b))
                 if area_ratio < 0.60:
                     continue
 
-                ratios_b = tri_b["adjacent_ratios"]
+                ratios_b = ratios_list_b[j]
                 if ratios_a and ratios_b:
                     best_r_diff = min(abs(ra - rb) for ra in ratios_a for rb in ratios_b)
                     r_term = min(1.0, best_r_diff / eff_ratio_tol)
@@ -186,7 +199,7 @@ def match_templates_detailed(
         rot_mat = np.array([[cos_t, -sin_t], [sin_t, cos_t]], dtype=np.float64)
         candidate_models.append((ca0, cb0, rot_mat, th0))
 
-    if len(kps_a) >= 4 and len(kps_b) >= 4:
+    if len(kps_a) >= 4 and len(kps_b) >= 4 and len(candidate_models) < 150:
         tree_a = cKDTree(kps_a)
         tree_b = cKDTree(kps_b)
         k_nn_a = min(5, len(kps_a))
@@ -211,6 +224,8 @@ def match_templates_detailed(
                     segs_b.append((ib, lb, math.atan2(vb[1], vb[0])))
 
         for ia, la, tha in segs_a:
+            if len(candidate_models) >= 150:
+                break
             for ib, lb, thb in segs_b:
                 if abs(la - lb) / max(la, lb) > 0.10:
                     continue
@@ -220,6 +235,8 @@ def match_templates_detailed(
                 cos_t, sin_t = math.cos(th0), math.sin(th0)
                 rot_mat = np.array([[cos_t, -sin_t], [sin_t, cos_t]], dtype=np.float64)
                 candidate_models.append((kps_a[ia], kps_b[ib], rot_mat, th0))
+                if len(candidate_models) >= 150:
+                    break
 
     shape_a = template_a.get("image_shape", (584, 565))
     spatial_tol = max(14.0, 0.032 * float(min(shape_a[0], shape_a[1])))

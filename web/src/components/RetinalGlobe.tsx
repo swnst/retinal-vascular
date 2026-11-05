@@ -45,6 +45,7 @@ export default function RetinalGlobe({
   const beaconGroupRef = useRef<THREE.Group | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const skelMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const textureLoadSeqRef = useRef<number>(0);
 
   // --- 3D Viewport Navigation State ---
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
@@ -135,6 +136,7 @@ export default function RetinalGlobe({
         uReliefScale: { value: 0.22 },
         uTime: { value: 0.0 },
         uExplodedZ: { value: 0.0 },
+        uImageAspect: { value: 1.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -145,14 +147,20 @@ export default function RetinalGlobe({
         uniform float uGlowThreshold;
         uniform float uReliefScale;
         uniform float uExplodedZ;
+        uniform float uImageAspect;
 
         void main() {
           vUv = uv;
           vNormal = normalize(normalMatrix * normal);
           
+          vec2 centered = (uv - 0.5) * 2.0;
+          float scaleX = uImageAspect >= 1.0 ? 1.0 : uImageAspect;
+          float scaleY = uImageAspect >= 1.0 ? (1.0 / uImageAspect) : 1.0;
+          vec2 texUv = vec2(centered.x / (2.0 * scaleX) + 0.5, centered.y / (2.0 * scaleY) + 0.5);
+
           float prob = 0.0;
-          if (hasProbMap > 0.5) {
-            prob = texture2D(tProbMap, uv).r;
+          if (hasProbMap > 0.5 && texUv.x >= 0.0 && texUv.x <= 1.0 && texUv.y >= 0.0 && texUv.y <= 1.0) {
+            prob = texture2D(tProbMap, texUv).r;
           }
           
           float vesselFactor = smoothstep(uGlowThreshold - 0.05, uGlowThreshold + 0.15, prob);
@@ -174,22 +182,28 @@ export default function RetinalGlobe({
         uniform float hasProbMap;
         uniform float uGlowThreshold;
         uniform float uTime;
+        uniform float uImageAspect;
 
         void main() {
           vec2 centeredUv = (vUv - 0.5) * 2.0;
           float distFromCenter = length(centeredUv);
-          if (distFromCenter > 0.96) {
+          if (distFromCenter > 0.98) {
             discard;
           }
 
-          vec3 baseColor = vec3(0.06, 0.03, 0.02);
-          if (hasFundus > 0.5) {
-            vec4 fundusSample = texture2D(tFundus, vUv);
+          float scaleX = uImageAspect >= 1.0 ? 1.0 : uImageAspect;
+          float scaleY = uImageAspect >= 1.0 ? (1.0 / uImageAspect) : 1.0;
+          vec2 texUv = vec2(centeredUv.x / (2.0 * scaleX) + 0.5, centeredUv.y / (2.0 * scaleY) + 0.5);
+          bool inBounds = (texUv.x >= 0.0 && texUv.x <= 1.0 && texUv.y >= 0.0 && texUv.y <= 1.0);
+
+          vec3 baseColor = vec3(0.02, 0.03, 0.05);
+          if (hasFundus > 0.5 && inBounds) {
+            vec4 fundusSample = texture2D(tFundus, texUv);
             baseColor = fundusSample.rgb;
           }
 
-          if (hasProbMap > 0.5) {
-            float prob = texture2D(tProbMap, vUv).r;
+          if (hasProbMap > 0.5 && inBounds) {
+            float prob = texture2D(tProbMap, texUv).r;
             if (prob >= uGlowThreshold) {
               float intensity = (prob - uGlowThreshold) / max(0.001, (1.0 - uGlowThreshold));
               float pulse = 0.88 + 0.12 * sin(uTime * 3.0 + vUv.x * 20.0);
@@ -203,7 +217,7 @@ export default function RetinalGlobe({
           float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
           baseColor += vec3(0.02, 0.55, 0.75) * fresnel * 0.40;
 
-          float edgeAlpha = 1.0 - smoothstep(0.93, 0.96, distFromCenter);
+          float edgeAlpha = 1.0 - smoothstep(0.95, 0.98, distFromCenter);
           gl_FragColor = vec4(baseColor, edgeAlpha);
         }
       `,
@@ -222,6 +236,7 @@ export default function RetinalGlobe({
         tSkeleton: { value: null },
         hasSkeleton: { value: 0.0 },
         uOpacity: { value: 0.0 },
+        uImageAspect: { value: 1.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -235,14 +250,20 @@ export default function RetinalGlobe({
         uniform sampler2D tSkeleton;
         uniform float hasSkeleton;
         uniform float uOpacity;
+        uniform float uImageAspect;
 
         void main() {
           vec2 centeredUv = (vUv - 0.5) * 2.0;
-          if (length(centeredUv) > 0.96) discard;
+          if (length(centeredUv) > 0.98) discard;
 
           if (hasSkeleton < 0.5) discard;
 
-          vec4 skeletonTexel = texture2D(tSkeleton, vUv);
+          float scaleX = uImageAspect >= 1.0 ? 1.0 : uImageAspect;
+          float scaleY = uImageAspect >= 1.0 ? (1.0 / uImageAspect) : 1.0;
+          vec2 texUv = vec2(centeredUv.x / (2.0 * scaleX) + 0.5, centeredUv.y / (2.0 * scaleY) + 0.5);
+          if (texUv.x < 0.0 || texUv.x > 1.0 || texUv.y < 0.0 || texUv.y > 1.0) discard;
+
+          vec4 skeletonTexel = texture2D(tSkeleton, texUv);
           float intensity = max(skeletonTexel.r, max(skeletonTexel.g, skeletonTexel.b));
           if (intensity < 0.18) discard;
 
@@ -388,6 +409,13 @@ export default function RetinalGlobe({
           }
         }
       });
+      materialRef.current = null;
+      skelMaterialRef.current = null;
+      dishMeshRef.current = null;
+      skeletonMeshRef.current = null;
+      beaconGroupRef.current = null;
+      ocularGroupRef.current = null;
+      cameraRef.current = null;
       renderer.dispose();
     };
   }, []);
@@ -395,13 +423,18 @@ export default function RetinalGlobe({
   // --- Texture Uniform Updates ---
   useEffect(() => {
     if (!materialRef.current) return;
+    const currentSeq = ++textureLoadSeqRef.current;
     const loader = new THREE.TextureLoader();
 
     if (fundusImageBase64) {
       loader.load(
         fundusImageBase64,
         (tex) => {
-          if (!materialRef.current) return;
+          if (currentSeq !== textureLoadSeqRef.current || !materialRef.current) {
+            tex.dispose();
+            return;
+          }
+          tex.colorSpace = THREE.SRGBColorSpace;
           tex.minFilter = THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           if (materialRef.current.uniforms.tFundus.value) {
@@ -413,7 +446,7 @@ export default function RetinalGlobe({
         },
         undefined,
         () => {
-          if (!materialRef.current) return;
+          if (currentSeq !== textureLoadSeqRef.current || !materialRef.current) return;
           if (materialRef.current.uniforms.tFundus.value) {
             materialRef.current.uniforms.tFundus.value.dispose();
             materialRef.current.uniforms.tFundus.value = null;
@@ -434,7 +467,11 @@ export default function RetinalGlobe({
       loader.load(
         probMapBase64,
         (tex) => {
-          if (!materialRef.current) return;
+          if (currentSeq !== textureLoadSeqRef.current || !materialRef.current) {
+            tex.dispose();
+            return;
+          }
+          tex.colorSpace = THREE.NoColorSpace;
           tex.minFilter = THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           if (materialRef.current.uniforms.tProbMap.value) {
@@ -446,7 +483,7 @@ export default function RetinalGlobe({
         },
         undefined,
         () => {
-          if (!materialRef.current) return;
+          if (currentSeq !== textureLoadSeqRef.current || !materialRef.current) return;
           if (materialRef.current.uniforms.tProbMap.value) {
             materialRef.current.uniforms.tProbMap.value.dispose();
             materialRef.current.uniforms.tProbMap.value = null;
@@ -467,7 +504,11 @@ export default function RetinalGlobe({
       loader.load(
         skeletonBase64,
         (tex) => {
-          if (!skelMaterialRef.current) return;
+          if (currentSeq !== textureLoadSeqRef.current || !skelMaterialRef.current) {
+            tex.dispose();
+            return;
+          }
+          tex.colorSpace = THREE.NoColorSpace;
           tex.minFilter = THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           if (skelMaterialRef.current.uniforms.tSkeleton.value) {
@@ -479,7 +520,7 @@ export default function RetinalGlobe({
         },
         undefined,
         () => {
-          if (!skelMaterialRef.current) return;
+          if (currentSeq !== textureLoadSeqRef.current || !skelMaterialRef.current) return;
           if (skelMaterialRef.current.uniforms.tSkeleton.value) {
             skelMaterialRef.current.uniforms.tSkeleton.value.dispose();
             skelMaterialRef.current.uniforms.tSkeleton.value = null;
@@ -498,18 +539,28 @@ export default function RetinalGlobe({
     }
   }, [fundusImageBase64, probMapBase64, skeletonBase64]);
 
-  // --- Shader Uniform Updates ---
+  // --- Shader Uniform & Mesh Aspect Updates ---
   useEffect(() => {
+    const aspect = Math.max(1, imageWidth) / Math.max(1, imageHeight);
+
+    if (dishMeshRef.current) {
+      dishMeshRef.current.scale.set(1.0, 1.0, 1.0);
+    }
+    if (skeletonMeshRef.current) {
+      skeletonMeshRef.current.scale.set(1.0, 1.0, 1.0);
+    }
     if (materialRef.current) {
+      materialRef.current.uniforms.uImageAspect.value = aspect;
       materialRef.current.uniforms.uGlowThreshold.value = glowThreshold;
       materialRef.current.uniforms.uReliefScale.value = reliefScale;
       materialRef.current.uniforms.uExplodedZ.value = explodedLayers ? -0.25 : 0.0;
     }
     if (skelMaterialRef.current && skeletonMeshRef.current) {
+      skelMaterialRef.current.uniforms.uImageAspect.value = aspect;
       skelMaterialRef.current.uniforms.uOpacity.value = explodedLayers ? 0.90 : 0.0;
       skeletonMeshRef.current.position.z = explodedLayers ? 0.45 : 0.0;
     }
-  }, [glowThreshold, reliefScale, explodedLayers]);
+  }, [glowThreshold, reliefScale, explodedLayers, imageWidth, imageHeight]);
 
   // --- 3D Landmarks & Bifurcation Nodes ---
   useEffect(() => {
@@ -527,21 +578,25 @@ export default function RetinalGlobe({
 
     if (!showLandmarks) return;
 
-    const mapPixelToCup = (px: number, py: number) => {
-      const u = px / Math.max(1, imageWidth);
-      const v = py / Math.max(1, imageHeight);
-      const x = (u - 0.5) * 3.2;
-      const y = (0.5 - v) * 3.2;
-      const dx = (u - 0.5) * 2.0;
-      const dy = (v - 0.5) * 2.0;
-      const r = Math.sqrt(dx * dx + dy * dy);
-      const z = -0.42 * Math.max(0.0, 1.0 - r * r) + 0.06;
+    const mapPixelToCup = (px: number, py: number, isBifurcation: boolean = false) => {
+      const aspect = Math.max(1, imageWidth) / Math.max(1, imageHeight);
+      const scaleX = aspect >= 1.0 ? 1.0 : aspect;
+      const scaleY = aspect >= 1.0 ? 1.0 / aspect : 1.0;
+      const uNorm = ((px / Math.max(1, imageWidth)) - 0.5) * 2.0 * scaleX;
+      const vNorm = (0.5 - (py / Math.max(1, imageHeight))) * 2.0 * scaleY;
+      const x = uNorm * 1.6;
+      const y = vNorm * 1.6;
+      const rSq = uNorm * uNorm + vNorm * vNorm;
+      const zCup = -0.42 * Math.max(0.0, 1.0 - rSq);
+      const z = isBifurcation
+        ? (explodedLayers ? zCup + 0.45 + 0.06 : zCup + 0.025)
+        : (zCup + 0.025 + (explodedLayers ? -0.25 : 0.0));
       return new THREE.Vector3(x, y, z);
     };
 
     // --- Optic Disc Beacon ---
     if (opticDisc) {
-      const odPos = mapPixelToCup(opticDisc.x, opticDisc.y);
+      const odPos = mapPixelToCup(opticDisc.x, opticDisc.y, false);
       const ringGeo = new THREE.RingGeometry(0.12, 0.14, 32);
       const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide });
       const odRing = new THREE.Mesh(ringGeo, ringMat);
@@ -558,7 +613,7 @@ export default function RetinalGlobe({
 
     // --- Fovea Beacon ---
     if (fovea) {
-      const fovPos = mapPixelToCup(fovea.x, fovea.y);
+      const fovPos = mapPixelToCup(fovea.x, fovea.y, false);
       const ringGeo = new THREE.RingGeometry(0.08, 0.10, 32);
       const ringMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
       const fovRing = new THREE.Mesh(ringGeo, ringMat);
@@ -575,8 +630,8 @@ export default function RetinalGlobe({
 
     // --- Geodesic Disc-to-Fovea Arc ---
     if (opticDisc && fovea) {
-      const p1 = mapPixelToCup(opticDisc.x, opticDisc.y);
-      const p2 = mapPixelToCup(fovea.x, fovea.y);
+      const p1 = mapPixelToCup(opticDisc.x, opticDisc.y, false);
+      const p2 = mapPixelToCup(fovea.x, fovea.y, false);
       const mid = p1.clone().add(p2).multiplyScalar(0.5);
       mid.z += 0.22;
 
@@ -590,12 +645,11 @@ export default function RetinalGlobe({
 
     // --- Vascular Bifurcation Landmarks ---
     if (landmarks.length > 0) {
-      const pts = landmarks.slice(0, 64);
+      const pts = landmarks.slice(0, 220);
       const starGeo = new THREE.SphereGeometry(0.02, 8, 8);
       const starMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
       for (const pt of pts) {
-        const pos = mapPixelToCup(pt.x, pt.y);
-        if (explodedLayers) pos.z += 0.40;
+        const pos = mapPixelToCup(pt.x, pt.y, true);
         const star = new THREE.Mesh(starGeo, starMat);
         star.position.copy(pos);
         group.add(star);

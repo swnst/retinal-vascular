@@ -96,10 +96,11 @@ export default function BiometricDashboard() {
 
   // --- Additional Image Dimensions & Upload State ---
   const [imageDimA, setImageDimA] = useState<{ width: number; height: number }>({ width: 565, height: 584 });
+  const [imageDimB, setImageDimB] = useState<{ width: number; height: number }>({ width: 565, height: 584 });
   const [analyzedThresholdA, setAnalyzedThresholdA] = useState<number | null>(null);
   const [uploadingTarget, setUploadingTarget] = useState<"A" | "B" | null>(null);
   const [customScanA, setCustomScanA] = useState<{ image: string; label: string; width: number; height: number } | null>(null);
-  const [customScanB, setCustomScanB] = useState<{ image: string; label: string } | null>(null);
+  const [customScanB, setCustomScanB] = useState<{ image: string; label: string; width: number; height: number } | null>(null);
   const sidebarScrollRef = useRef<HTMLDivElement | null>(null);
 
   // --- Stage 1: Ocular Anatomy State ---
@@ -151,6 +152,24 @@ export default function BiometricDashboard() {
   // --- Notification Banner State ---
   const [statusBanner, setStatusBanner] = useState<{ text: string; type: "info" | "success" | "error" } | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestSeqRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelPendingRequests = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      cancelPendingRequests();
+    };
+  }, []);
 
   const showToast = (text: string, type: "info" | "success" | "error" = "info") => {
     setStatusBanner({ text, type });
@@ -250,6 +269,7 @@ export default function BiometricDashboard() {
 
   // --- Specimen Synchronization Handler ---
   const handleStageSwitch = (newStage: "ocular" | "matching" | "cohort") => {
+    cancelPendingRequests();
     setActiveStage(newStage);
     if (sidebarScrollRef.current) {
       sidebarScrollRef.current.scrollTop = 0;
@@ -275,12 +295,15 @@ export default function BiometricDashboard() {
         if (customScanA) {
           setFundusA(customScanA.image);
           setLabelA(customScanA.label);
+          setImageDimA({ width: customScanA.width, height: customScanA.height });
           if (customScanB) {
             setFundusB(customScanB.image);
             setLabelB(customScanB.label);
+            setImageDimB({ width: customScanB.width, height: customScanB.height });
           } else {
             setFundusB(customScanA.image);
             setLabelB(`${customScanA.label} (Target)`);
+            setImageDimB({ width: customScanA.width, height: customScanA.height });
           }
         }
       } else {
@@ -290,6 +313,8 @@ export default function BiometricDashboard() {
         if (mtPreset) {
           setFundusA(mtPreset.image_base64);
           setFundusB(mtPreset.image_b_base64 || mtPreset.image_base64);
+          setImageDimA({ width: 565, height: 584 });
+          setImageDimB({ width: 565, height: 584 });
           const labels = getMatchPresetLabels(mtPreset);
           setLabelA(labels.labelA);
           setLabelB(labels.labelB);
@@ -358,7 +383,7 @@ export default function BiometricDashboard() {
     { key: "cataract", label: "Cataract Haze 45% + Low Gamma", score: 0.864, isMatch: true, desc: "Media Opacity & Contrast Loss" },
     { key: "glare", label: "Corneal Glare 65% & Dim 0.8x", score: 0.867, isMatch: true, desc: "Specular Reflection & Low Exposure" },
     { key: "blur", label: "Optical Defocus Blur (sigma=2.5px)", score: 0.827, isMatch: true, desc: "Imperfect Focus & Astigmatism" },
-    { key: "noise", label: "Low-Light ISO Noise (sigma=16.0)", score: 0.727, isMatch: true, desc: "High Sensor Gain & Electronic Grain" },
+    { key: "noise", label: "Low-Light ISO Noise (sigma=16.0)", score: 0.7403, isMatch: true, desc: "High Sensor Gain & Electronic Grain" },
     { key: "eyelid", label: "Eyelid Occlusion 22%", score: 0.864, isMatch: true, desc: "Blink & Ptosis Artifacts" },
     { key: "torture", label: "Judge Torture Multi-Factor (All 7)", score: 0.634, isMatch: true, desc: "Worst-Case Multi-Vector Stress" },
   ];
@@ -401,6 +426,7 @@ export default function BiometricDashboard() {
 
   // --- Cohort Cell Drill-Down Handler ---
   const handleDrillDownFromCohort = (subjAId: string, subjBId: string, regimeOverride?: "baseline" | "torture") => {
+    cancelPendingRequests();
     const targetRegime = regimeOverride || cohortRegime;
     const dataA = getCohortSubjectData(subjAId);
     const dataB = getCohortSubjectData(subjBId);
@@ -408,10 +434,12 @@ export default function BiometricDashboard() {
     if (dataA.image) {
       setFundusA(dataA.image);
       setLabelA(dataA.label);
+      setImageDimA({ width: 565, height: 584 });
     }
     if (dataB.image) {
       setFundusB(dataB.image);
       setLabelB(dataB.label);
+      setImageDimB({ width: 565, height: 584 });
     }
 
     const pairKey = `${subjAId}-${subjBId}`;
@@ -445,6 +473,9 @@ export default function BiometricDashboard() {
 
   // --- Live Cohort Cross-Evaluation ---
   const handleRunLiveCohort = async () => {
+    cancelPendingRequests();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsRunningCohort(true);
     showToast(`Evaluating Cohort Cross-Matching under ${cohortRegime.toUpperCase()} regime...`, "info");
 
@@ -485,6 +516,7 @@ export default function BiometricDashboard() {
     const overrides = { ...liveCohortOverrides };
 
     for (let i = 0; i < pairs.length; i++) {
+      if (controller.signal.aborted) break;
       const { aId, bId } = pairs[i];
       setCohortProgress({ current: i + 1, total: pairs.length });
       const dataA = getCohortSubjectData(aId);
@@ -511,8 +543,10 @@ export default function BiometricDashboard() {
                 noise_sigma_b: 10.0,
                 elastic_alpha_b: 2.0,
               }
-            : {}
+            : {},
+          controller.signal
         );
+        if (controller.signal.aborted) break;
         // eslint-disable-next-line react-hooks/purity
         const elapsed = Math.round(performance.now() - t0);
         const cellData = {
@@ -526,18 +560,22 @@ export default function BiometricDashboard() {
           overrides[`${cohortRegime}:${bId}-${aId}`] = cellData;
         }
         setLiveCohortOverrides({ ...overrides });
-      } catch (err) {
+      } catch (err: unknown) {
+        if (controller.signal.aborted) break;
         console.error("Cohort eval failed for pair:", aId, bId, err);
       }
     }
-    setLiveCohortOverrides(overrides);
-    setIsRunningCohort(false);
-    setCohortProgress(null);
-    showToast(`Live Cohort verification completed across matrix cells!`, "success");
+    if (!controller.signal.aborted) {
+      setLiveCohortOverrides(overrides);
+      setIsRunningCohort(false);
+      setCohortProgress(null);
+      showToast(`Live Cohort verification completed across matrix cells!`, "success");
+    }
   };
 
   // --- Stage 1: Specimen Preset Selection ---
   const handleSelectOcularPreset = (preset: PresetItem) => {
+    cancelPendingRequests();
     setSelectedOcularPresetId(preset.id);
     setCustomScanA(null);
     setImageDimA({ width: 565, height: 584 });
@@ -551,9 +589,12 @@ export default function BiometricDashboard() {
 
   // --- Stage 2: Scenario Preset Selection ---
   const handleSelectMatchPreset = (preset: PresetItem) => {
+    cancelPendingRequests();
     setSelectedMatchPresetId(preset.id);
     setCustomScanA(null);
     setCustomScanB(null);
+    setImageDimA({ width: 565, height: 584 });
+    setImageDimB({ width: 565, height: 584 });
     setFundusA(preset.image_base64);
     setFundusB(preset.image_b_base64 || preset.image_base64);
     setMatchResult(null);
@@ -659,8 +700,9 @@ export default function BiometricDashboard() {
         );
       } else {
         setFundusB(norm.image_base64);
+        setImageDimB({ width: norm.width, height: norm.height });
         setLabelB(file.name);
-        setCustomScanB({ image: norm.image_base64, label: file.name });
+        setCustomScanB({ image: norm.image_base64, label: file.name, width: norm.width, height: norm.height });
         setMatchResult(null);
         setSelectedMatchPresetId("custom");
         showToast(
@@ -679,31 +721,44 @@ export default function BiometricDashboard() {
   // --- AI Pipeline Execution ---
   const handleExecuteInference = async () => {
     if (!fundusA) return;
+    cancelPendingRequests();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const currentSeq = ++requestSeqRef.current;
     setIsProcessingA(true);
     showToast("Analyzing neural retinal vessel topology...", "info");
     try {
-      const seg = await requestSegmentation(fundusA, segThreshold, true, 25, 15, true);
+      const seg = await requestSegmentation(fundusA, segThreshold, true, 25, 15, true, controller.signal);
+      if (currentSeq !== requestSeqRef.current || controller.signal.aborted) return;
       setSegResultA(seg);
       setAnalyzedThresholdA(segThreshold);
 
       showToast("Localizing Optic Disc & Fovea anatomical landmarks...", "info");
-      const loc = await requestLocalization(fundusA, seg.vessel_mask_base64);
+      const loc = await requestLocalization(fundusA, seg.vessel_mask_base64, controller.signal);
+      if (currentSeq !== requestSeqRef.current || controller.signal.aborted) return;
       setLocResultA(loc);
       showToast(
         `Analysis Complete: Vessel Density ${(seg.vessel_density * 100).toFixed(1)}% | Bifurcations: ${seg.num_keypoints || 0} | OD-Fovea: ${loc.disc_to_fovea_distance.toFixed(1)}px`,
         "success"
       );
     } catch (err: unknown) {
+      if (currentSeq !== requestSeqRef.current || controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Pipeline execution failed";
       showToast(message, "error");
     } finally {
-      setIsProcessingA(false);
+      if (currentSeq === requestSeqRef.current) {
+        setIsProcessingA(false);
+      }
     }
   };
 
   // --- Biometric Matching Execution ---
   const handleExecuteVerification = async () => {
     if (!fundusA || !fundusB) return;
+    cancelPendingRequests();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const currentSeq = ++requestSeqRef.current;
     setIsMatching(true);
     showToast("Extracting Delaunay Invariants & Computing Hungarian Assignment...", "info");
     try {
@@ -724,8 +779,10 @@ export default function BiometricDashboard() {
           gamma_b: gammaB,
           spherical_warp_b: sphericalWarpB,
           elastic_alpha_b: elasticAlphaB,
-        }
+        },
+        controller.signal
       );
+      if (currentSeq !== requestSeqRef.current || controller.signal.aborted) return;
       setMatchResult(res);
       showToast(
         res.is_match
@@ -734,10 +791,13 @@ export default function BiometricDashboard() {
         res.is_match ? "success" : "error"
       );
     } catch (err: unknown) {
+      if (currentSeq !== requestSeqRef.current || controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Biometric verification failed";
       showToast(message, "error");
     } finally {
-      setIsMatching(false);
+      if (currentSeq === requestSeqRef.current) {
+        setIsMatching(false);
+      }
     }
   };
 
@@ -851,6 +911,8 @@ export default function BiometricDashboard() {
               rotateDegB={rotateDegB}
               scaleFactorB={scaleFactorB}
               brightnessB={brightnessB}
+              scanADimensions={matchResult?.template_a ? { width: matchResult.template_a.width, height: matchResult.template_a.height } : imageDimA}
+              scanBDimensions={matchResult?.template_b ? { width: matchResult.template_b.width, height: matchResult.template_b.height } : imageDimB}
             />
           ) : (
             /* STAGE 03: POPULATION COHORT MATRIX & STRESS DASHBOARD */
@@ -2177,15 +2239,15 @@ export default function BiometricDashboard() {
             )}
             <div className="text-gray-400 flex items-center justify-between">
               <span>ALGORITHM:</span>
-              <span className="text-gray-300">Kanjanasurat et al. (2020)</span>
+              <span className="text-gray-300">3-Stage Star-Vector + Kabsch SE(2) SVD</span>
             </div>
             <div className="text-gray-400 flex items-center justify-between">
               <span>INVARIANT BASIS:</span>
-              <span className="text-cyan-400 font-bold">Area Ratio + Internal Angles</span>
+              <span className="text-cyan-400 font-bold">Induced Subgraph Delaunay Mesh</span>
             </div>
             <div className="text-gray-400 flex items-center justify-between">
               <span>SOLVER:</span>
-              <span className="text-emerald-400 font-bold">Hungarian Bipartite 1:1</span>
+              <span className="text-emerald-400 font-bold">Hungarian + Closed-Form SVD</span>
             </div>
           </div>
         </aside>

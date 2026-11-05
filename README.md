@@ -32,13 +32,13 @@ The implemented platform exceeds the original targets across all core engineerin
 | Evaluation Dimension | Initial Capstone I Target | Delivered System Reality | Status |
 | :--- | :--- | :--- | :---: |
 | **Vessel Segmentation** | Standard U-Net (~0.70 Dice on DRIVE) | ResNet-34 U-Net v3 (`best_unet_model_v3.pth`, 24.4M params) with Tripartite BCE + Soft Dice + Soft-clDice loss reaching **0.7809 Dice, 0.9710 ROC-AUC, 97.56% Specificity** on DRIVE (0.7554 Dice, 0.9562 AUC on zero-leakage held-out validation) | Exceeded Target |
-| **Probability Binarization** | Static 0.50 cutoff | **Piecewise Quantile-Calibrated Adaptive Thresholding** ($`\tau_{\text{eff}} = \max(0.32, \min(0.60, 0.65 \cdot p_{95}))`$ for $`p_{95} < 0.85`$, else $`0.60`$) resilient to cataract opacity | Exceeded Target |
+| **Probability Binarization** | Static 0.50 cutoff | **Piecewise Quantile-Calibrated Adaptive Thresholding** ($$\tau_{\text{eff}} = \begin{cases} \tau, & \text{if } p_{95} \ge 0.85 \\ \max\!\left(0.10,\; \min\!\left(\tau,\; \frac{\tau}{0.60}\max(0.32,\; 0.65\,p_{95})\right)\right), & \text{if } p_{95} < 0.85 \end{cases}$$) resilient to cataract opacity | Exceeded Target |
 | **Landmark Localization** | Basic center heuristic on DRIVE | **3-Cue Structure-Tensor Convergence & Anisotropic Macular Prior** on 103 high-resolution IDRiD images (**99.03% OD Success, 94.17% Fovea Success**) | Exceeded Target |
 | **Biometric Matcher** | Independent Delaunay Invariants (fails under vertex dropout) | **3-Stage Star-Vector + Kabsch SE(2) SVD Constellation Consensus + Induced Common-Subgraph Delaunay Triangulation** | Exceeded Target |
 | **Clinical Robustness** | None (clean static scans only) | **11-Parameter Physical Degradation Suite**; passes 7-parameter `Judge Torture` stress at **63.4%** matching score (threshold: 20.0%) | Exceeded Target |
 | **Software Architecture** | Standalone Python scripts | **Decoupled Architecture**: FastAPI 2.0 Backend + Next.js 16 App Router Turbopack Frontend | Exceeded Target |
 | **Visualization and UI** | Static 2D plots | **3-Stage Three.js WebGL Studio**: 3D Retinal Globe with depth GLSL shader, Dual 3D Matcher with laser correspondence beams, and 4x4 Cohort Matrix | Exceeded Target |
-| **Automated Testing** | Manual inspection | **Automated Suite of 40 Pytest Tests**, ESLint (0 errors), Strict TypeScript (0 errors), Next.js Turbopack build | Exceeded Target |
+| **Automated Testing** | Manual inspection | **Comprehensive Automated Pytest Suite (55 Tests, 100% Pass Rate)**, ESLint (0 errors), Strict TypeScript (0 errors), Next.js Turbopack build | Exceeded Target |
 
 ---
 
@@ -118,7 +118,7 @@ where $S(X) = \text{ReLU}(X - \text{open}(X))$ performs differentiable soft skel
 ### 3.4 Piecewise Quantile-Calibrated Adaptive Thresholding
 To ensure robust foreground binarization across severe inter-patient illumination variance, media opacities, and cataract haze:
 
-$$\tau_{\text{eff}} = \begin{cases} \max\left(0.32, \min\left(0.60, 0.65 \cdot p_{95}\right)\right), & \text{if } p_{95} < 0.85 \\ 0.60, & \text{if } p_{95} \ge 0.85 \end{cases}$$
+$$\tau_{\text{eff}} = \begin{cases} \tau, & \text{if } p_{95} \ge 0.85 \\ \max\!\left(0.10,\; \min\!\left(\tau,\; \frac{\tau}{0.60}\max(0.32,\; 0.65\,p_{95})\right)\right), & \text{if } p_{95} < 0.85 \end{cases}$$
 
 where $p_{95}$ is the 95th percentile intensity of the predicted foreground vascular probability map calculated strictly within the Field of View (FOV). Clamping to $[0.32, 0.60]$ prevents background noise breakthrough under high clarity while preserving faint vascular trunks under heavy scattering.
 
@@ -270,12 +270,19 @@ retinal-vascular/
 │   ├── postprocess.py                 # Morphological connected component noise filtering and binary hole filling
 │   ├── predict.py                     # TTA-augmented batch/single inference
 │   └── train.py                       # Tripartite loss trainer (BCE + Dice + clDice)
+├── docs/                              # Academic Thesis Manuscript and Reference Compendium
+│   ├── references/                    # Bibliographic database and master reference mapping
+│   │   ├── MASTER_REFERENCE_COMPENDIUM.md
+│   │   └── references.bib
+│   ├── VERA_THESIS_DOCUMENT.html      # Self-contained academic thesis document
+│   └── VERA_THESIS_MANUSCRIPT.md      # Comprehensive 6-chapter thesis manuscript (1,200+ lines)
 ├── evaluation/                        # Empirical Benchmark and Metric Evaluation Suite
 │   ├── __init__.py
 │   ├── compare_models.py              # Comparative performance benchmarks across checkpoints
 │   ├── evaluate_localization.py       # IDRiD landmark detection accuracy and error radii
 │   ├── evaluate_matching.py           # Verification ROC/DET curves and EER metrics
 │   ├── evaluate_vessel.py             # Vessel segmentation benchmark runner (DRIVE, STARE, HRF)
+│   ├── generate_thesis_figures.py     # Publication-grade 300 DPI scientific figures engine (17 figures)
 │   ├── metrics.py                     # Standardized evaluation metrics (Dice, Sensitivity, Specificity, Accuracy, ROC-AUC)
 │   └── threshold_analysis.py          # Adaptive binarization threshold sweep engine
 ├── matching/                          # Biometric Matching Engine
@@ -285,6 +292,7 @@ retinal-vascular/
 │   ├── skeleton.py                    # Zhang-Suen and Lee medial axis thinning with spur pruning
 │   └── triangulation.py               # Delaunay triangulation and invariant geometry
 ├── results/                           # Quantitative Benchmark Reports and Visual Artifacts
+│   ├── figures/                       # Publication-grade thesis figures (17 figures at 300 DPI)
 │   ├── fovea/                         # Fovea localization hyperparameters
 │   │   └── best_config.json
 │   ├── localization/                  # Landmark localization evaluation reports and CSVs
@@ -301,8 +309,9 @@ retinal-vascular/
 │   ├── threshold_optimization_results.csv # Binarization parameter grid search records
 │   ├── training_curves.png            # Initial multi-dataset U-Net training convergence curve
 │   ├── training_curves_v2.png         # Production Soft-clDice U-Net v3 training convergence curve
-│   └── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
-├── tests/                             # Automated Pytest Suite (47 unit & integration tests)
+│   ├── vessel_evaluation_report.md        # Comprehensive multi-dataset segmentation benchmark
+│   └── vessel_prediction_samples.png      # Multi-dataset segmentation prediction samples
+├── tests/                             # Automated Pytest Suite (55 unit & integration tests)
 │   ├── __init__.py
 │   ├── test_api.py                    # REST endpoint and schema validation tests
 │   ├── test_bezier_matched_filter.py  # Bézier curve matched filter baseline tests
@@ -362,7 +371,7 @@ retinal-vascular/
    ```powershell
    pytest tests/ -v
    ```
-   *Expected outcome: 47 passed in ~29s.*
+   *Expected outcome: 55 passed in ~35s.*
 4. Start the FastAPI backend server:
    ```powershell
    uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload

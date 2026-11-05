@@ -90,14 +90,14 @@ def _normalize_image_input(
     array = np.asarray(image_input)
     if array.size == 0:
         raise ValueError("image input must not be empty.")
-    if not (np.issubdtype(array.dtype, np.number) or np.issubdtype(array.dtype, np.bool_)):
-        raise TypeError(f"image input must use numeric or boolean dtype; got {array.dtype}.")
+    if array.dtype == np.bool_:
+        raise TypeError("Boolean arrays are not valid fundus intensity images.")
+    if not np.issubdtype(array.dtype, np.number):
+        raise TypeError(f"image input must use numeric dtype; got {array.dtype}.")
     if not np.all(np.isfinite(array)):
         raise ValueError("image input contains NaN or Inf.")
 
     if array.ndim == 2:
-        if array.dtype == np.bool_:
-            raise TypeError("image input must contain intensity values, not boolean data.")
         intensity = array.astype(np.float32, copy=True)
         minimum = float(intensity.min())
         maximum = float(intensity.max())
@@ -106,13 +106,35 @@ def _normalize_image_input(
         if maximum <= 1.0:
             intensity *= 255.0
         elif maximum > 255.0:
-            raise ValueError("image input values must be in [0,1] or [0,255].")
+            denom = 65535.0 if maximum > 4095.0 else maximum
+            intensity = (intensity / denom) * 255.0
         uint8_2d = np.rint(intensity).clip(0, 255).astype(np.uint8)
         return cv2.merge((uint8_2d, uint8_2d, uint8_2d))
     elif array.ndim == 3 and array.shape[2] in (3, 4):
-        channels = array[:, :, :3].astype(np.float32, copy=True)
-        if float(channels.max()) <= 1.0:
+        if array.shape[2] == 4:
+            alpha_raw = array[:, :, 3].astype(np.float32)
+            color_raw = array[:, :, :3].astype(np.float32, copy=True)
+            max_a = float(alpha_raw.max())
+            if max_a <= 1.05:
+                alpha = np.clip(alpha_raw, 0.0, 1.0)
+            elif max_a > 255.0:
+                denom_a = 65535.0 if max_a > 4095.0 else max_a
+                alpha = np.clip(alpha_raw / denom_a, 0.0, 1.0)
+            else:
+                alpha = np.clip(alpha_raw / 255.0, 0.0, 1.0)
+            channels = color_raw * alpha[:, :, None]
+        else:
+            channels = array[:, :, :3].astype(np.float32, copy=True)
+
+        minimum = float(channels.min())
+        maximum = float(channels.max())
+        if minimum < 0.0:
+            raise ValueError("image input intensity values must be non-negative.")
+        if maximum <= 1.0:
             channels *= 255.0
+        elif maximum > 255.0:
+            denom = 65535.0 if maximum > 4095.0 else maximum
+            channels = (channels / denom) * 255.0
         uint8_3d = np.rint(channels).clip(0, 255).astype(np.uint8)
         # --- Color Space Normalization ---
         if color_order.upper() == "RGB":

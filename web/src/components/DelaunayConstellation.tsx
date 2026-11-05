@@ -16,6 +16,8 @@ interface DelaunayConstellationProps {
   rotateDegB?: number;
   scaleFactorB?: number;
   brightnessB?: number;
+  scanADimensions?: { width: number; height: number };
+  scanBDimensions?: { width: number; height: number };
 }
 
 // --- AAA 3D Dual Retinal Constellation & Real-Time Laser Matcher ---
@@ -30,14 +32,21 @@ export default function DelaunayConstellation({
   rotateDegB = 0.0,
   scaleFactorB = 1.0,
   brightnessB = 1.0,
+  scanADimensions,
+  scanBDimensions,
 }: DelaunayConstellationProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const mainGroupRef = useRef<THREE.Group | null>(null);
   const planeBGroupRef = useRef<THREE.Group | null>(null);
+  const meshARef = useRef<THREE.Mesh | null>(null);
+  const meshBRef = useRef<THREE.Mesh | null>(null);
   const matARef = useRef<THREE.ShaderMaterial | null>(null);
   const matBRef = useRef<THREE.ShaderMaterial | null>(null);
+  const texASeqRef = useRef<number>(0);
+  const texBSeqRef = useRef<number>(0);
   const networkGroupRef = useRef<THREE.Group | null>(null);
+  const networkGroupBRef = useRef<THREE.Group | null>(null);
 
   // --- 3D Viewport Controls ---
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
@@ -142,17 +151,17 @@ export default function DelaunayConstellation({
           void main() {
             vec2 centeredUv = (vUv - 0.5) * 2.0;
             float r = length(centeredUv);
-            if (r > 0.96) discard;
+            if (r > 0.98) discard;
 
             vec3 baseColor = vec3(0.08, 0.05, 0.04);
             if (hasFundus > 0.5) {
               baseColor = texture2D(tFundus, vUv).rgb * uBrightness;
             }
 
-            float rim = smoothstep(0.85, 0.96, r);
+            float rim = smoothstep(0.85, 0.98, r);
             baseColor = mix(baseColor, uTint, rim * 0.45);
 
-            float edgeAlpha = 1.0 - smoothstep(0.92, 0.96, r);
+            float edgeAlpha = 1.0 - smoothstep(0.94, 0.98, r);
             gl_FragColor = vec4(baseColor, edgeAlpha * 0.92);
           }
         `,
@@ -169,6 +178,7 @@ export default function DelaunayConstellation({
     const meshA = new THREE.Mesh(planeGeo, matA);
     meshA.position.set(-1.65, 0, -0.04);
     mainGroup.add(meshA);
+    meshARef.current = meshA;
 
     // --- Plane B Setup ---
     const planeBGroup = new THREE.Group();
@@ -181,6 +191,11 @@ export default function DelaunayConstellation({
     const meshB = new THREE.Mesh(planeGeo, matB);
     meshB.position.set(0, 0, -0.04);
     planeBGroup.add(meshB);
+    meshBRef.current = meshB;
+
+    const networkGroupB = new THREE.Group();
+    planeBGroup.add(networkGroupB);
+    networkGroupBRef.current = networkGroupB;
 
     // --- Common Constellation Network Group ---
     const networkGroup = new THREE.Group();
@@ -301,6 +316,15 @@ export default function DelaunayConstellation({
           }
         }
       });
+      meshARef.current = null;
+      meshBRef.current = null;
+      matARef.current = null;
+      matBRef.current = null;
+      mainGroupRef.current = null;
+      planeBGroupRef.current = null;
+      networkGroupRef.current = null;
+      networkGroupBRef.current = null;
+      cameraRef.current = null;
       renderer.dispose();
     };
   }, []);
@@ -308,11 +332,16 @@ export default function DelaunayConstellation({
   // --- Dynamic Texture A Updates ---
   useEffect(() => {
     if (!matARef.current) return;
+    const currentSeq = ++texASeqRef.current;
     if (fundusABase64) {
       new THREE.TextureLoader().load(
         fundusABase64,
         (tex) => {
-          if (!matARef.current) return;
+          if (currentSeq !== texASeqRef.current || !matARef.current) {
+            tex.dispose();
+            return;
+          }
+          tex.colorSpace = THREE.SRGBColorSpace;
           tex.minFilter = THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           if (matARef.current.uniforms.tFundus.value) {
@@ -324,7 +353,7 @@ export default function DelaunayConstellation({
         },
         undefined,
         () => {
-          if (!matARef.current) return;
+          if (currentSeq !== texASeqRef.current || !matARef.current) return;
           if (matARef.current.uniforms.tFundus.value) {
             matARef.current.uniforms.tFundus.value.dispose();
             matARef.current.uniforms.tFundus.value = null;
@@ -346,12 +375,17 @@ export default function DelaunayConstellation({
   // --- Dynamic Texture B Updates ---
   useEffect(() => {
     if (!matBRef.current) return;
+    const currentSeq = ++texBSeqRef.current;
     const textureToLoadB = perturbedFundusBBase64 || fundusBBase64;
     if (textureToLoadB) {
       new THREE.TextureLoader().load(
         textureToLoadB,
         (tex) => {
-          if (!matBRef.current) return;
+          if (currentSeq !== texBSeqRef.current || !matBRef.current) {
+            tex.dispose();
+            return;
+          }
+          tex.colorSpace = THREE.SRGBColorSpace;
           tex.minFilter = THREE.LinearFilter;
           tex.magFilter = THREE.LinearFilter;
           if (matBRef.current.uniforms.tFundus.value) {
@@ -363,7 +397,7 @@ export default function DelaunayConstellation({
         },
         undefined,
         () => {
-          if (!matBRef.current) return;
+          if (currentSeq !== texBSeqRef.current || !matBRef.current) return;
           if (matBRef.current.uniforms.tFundus.value) {
             matBRef.current.uniforms.tFundus.value.dispose();
             matBRef.current.uniforms.tFundus.value = null;
@@ -382,10 +416,32 @@ export default function DelaunayConstellation({
     }
   }, [fundusBBase64, perturbedFundusBBase64]);
 
+  // --- Aspect Scaling for Scan A and Scan B Planes ---
+  useEffect(() => {
+    const wA = templateA?.width ?? scanADimensions?.width ?? 565;
+    const hA = templateA?.height ?? scanADimensions?.height ?? 584;
+    const aspectA = Math.max(1, wA) / Math.max(1, hA);
+    const scaleAX = aspectA >= 1.0 ? 1.0 : aspectA;
+    const scaleAY = aspectA >= 1.0 ? 1.0 / aspectA : 1.0;
+    if (meshARef.current) {
+      meshARef.current.scale.set(scaleAX, scaleAY, 1.0);
+    }
+
+    const wB = templateB?.width ?? scanBDimensions?.width ?? 565;
+    const hB = templateB?.height ?? scanBDimensions?.height ?? 584;
+    const aspectB = Math.max(1, wB) / Math.max(1, hB);
+    const scaleBX = aspectB >= 1.0 ? 1.0 : aspectB;
+    const scaleBY = aspectB >= 1.0 ? 1.0 / aspectB : 1.0;
+    if (meshBRef.current) {
+      meshBRef.current.scale.set(scaleBX, scaleBY, 1.0);
+    }
+  }, [templateA, templateB, scanADimensions, scanBDimensions]);
+
   // --- Dynamic Constellation & Laser Correspondence Beams ---
   useEffect(() => {
     if (!networkGroupRef.current) return;
     const netGroup = networkGroupRef.current;
+    const netGroupB = networkGroupBRef.current;
 
     while (netGroup.children.length > 0) {
       const child = netGroup.children[0];
@@ -397,17 +453,52 @@ export default function DelaunayConstellation({
       netGroup.remove(child);
     }
 
-    // --- Coordinate Conversion Matching 2.7x2.7 Plane ---
-    const mapPixelTo3D = (px: number, py: number, widthImg: number, heightImg: number, xCenterOffset: number) => {
+    if (netGroupB) {
+      while (netGroupB.children.length > 0) {
+        const child = netGroupB.children[0];
+        if (child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.LineSegments || child instanceof THREE.Line) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+          else child.material?.dispose();
+        }
+        netGroupB.remove(child);
+      }
+    }
+
+    const wA = templateA?.width ?? scanADimensions?.width ?? 565;
+    const hA = templateA?.height ?? scanADimensions?.height ?? 584;
+    const aspectA = Math.max(1, wA) / Math.max(1, hA);
+    const scaleAX = aspectA >= 1.0 ? 1.0 : aspectA;
+    const scaleAY = aspectA >= 1.0 ? 1.0 / aspectA : 1.0;
+
+    const wB = templateB?.width ?? scanBDimensions?.width ?? 565;
+    const hB = templateB?.height ?? scanBDimensions?.height ?? 584;
+    const aspectB = Math.max(1, wB) / Math.max(1, hB);
+    const scaleBX = aspectB >= 1.0 ? 1.0 : aspectB;
+    const scaleBY = aspectB >= 1.0 ? 1.0 / aspectB : 1.0;
+
+    // --- Local 3D Coordinate Mapping ---
+    const mapPixelToLocal3D = (
+      px: number,
+      py: number,
+      widthImg: number,
+      heightImg: number,
+      scaleX: number,
+      scaleY: number,
+      xCenterOffset: number = 0.0,
+      zLocal: number = 0.025
+    ) => {
       const u = px / Math.max(1, widthImg);
       const v = py / Math.max(1, heightImg);
-      const x = (u - 0.5) * 2.7 + xCenterOffset;
-      const y = (0.5 - v) * 2.7;
-      return new THREE.Vector3(x, y, 0.0);
+      const x = (u - 0.5) * 2.7 * scaleX + xCenterOffset;
+      const y = (0.5 - v) * 2.7 * scaleY;
+      return new THREE.Vector3(x, y, zLocal);
     };
 
     const buildDelaunayNetwork = (
       template: TemplateSummary,
+      scaleX: number,
+      scaleY: number,
       xOffset: number,
       nodeColor: number,
       wireColor: number,
@@ -420,8 +511,8 @@ export default function DelaunayConstellation({
       const ptGeo = new THREE.BufferGeometry();
       const ptPos: number[] = [];
       template.keypoints.forEach((pt) => {
-        const v = mapPixelTo3D(pt.x, pt.y, wImg, hImg, xOffset);
-        ptPos.push(v.x, v.y, v.z + 0.02);
+        const v = mapPixelToLocal3D(pt.x, pt.y, wImg, hImg, scaleX, scaleY, xOffset, 0.025);
+        ptPos.push(v.x, v.y, v.z);
       });
       ptGeo.setAttribute("position", new THREE.Float32BufferAttribute(ptPos, 3));
       const ptMat = new THREE.PointsMaterial({
@@ -436,24 +527,24 @@ export default function DelaunayConstellation({
       const matchedLines: number[] = [];
 
       template.triangles.forEach((tri) => {
-        const v0 = mapPixelTo3D(tri.vertices[0][0], tri.vertices[0][1], wImg, hImg, xOffset);
-        const v1 = mapPixelTo3D(tri.vertices[1][0], tri.vertices[1][1], wImg, hImg, xOffset);
-        const v2 = mapPixelTo3D(tri.vertices[2][0], tri.vertices[2][1], wImg, hImg, xOffset);
+        const v0 = mapPixelToLocal3D(tri.vertices[0][0], tri.vertices[0][1], wImg, hImg, scaleX, scaleY, xOffset, 0.025);
+        const v1 = mapPixelToLocal3D(tri.vertices[1][0], tri.vertices[1][1], wImg, hImg, scaleX, scaleY, xOffset, 0.025);
+        const v2 = mapPixelToLocal3D(tri.vertices[2][0], tri.vertices[2][1], wImg, hImg, scaleX, scaleY, xOffset, 0.025);
 
-        standardLines.push(v0.x, v0.y, v0.z + 0.02, v1.x, v1.y, v1.z + 0.02);
-        standardLines.push(v1.x, v1.y, v1.z + 0.02, v2.x, v2.y, v2.z + 0.02);
-        standardLines.push(v2.x, v2.y, v2.z + 0.02, v0.x, v0.y, v0.z + 0.02);
+        standardLines.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z);
+        standardLines.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+        standardLines.push(v2.x, v2.y, v2.z, v0.x, v0.y, v0.z);
       });
 
       matchedTrianglesVerts.forEach((verts) => {
         if (verts && verts.length >= 3) {
-          const v0 = mapPixelTo3D(verts[0][0], verts[0][1], wImg, hImg, xOffset);
-          const v1 = mapPixelTo3D(verts[1][0], verts[1][1], wImg, hImg, xOffset);
-          const v2 = mapPixelTo3D(verts[2][0], verts[2][1], wImg, hImg, xOffset);
+          const v0 = mapPixelToLocal3D(verts[0][0], verts[0][1], wImg, hImg, scaleX, scaleY, xOffset, 0.035);
+          const v1 = mapPixelToLocal3D(verts[1][0], verts[1][1], wImg, hImg, scaleX, scaleY, xOffset, 0.035);
+          const v2 = mapPixelToLocal3D(verts[2][0], verts[2][1], wImg, hImg, scaleX, scaleY, xOffset, 0.035);
 
-          matchedLines.push(v0.x, v0.y, v0.z + 0.03, v1.x, v1.y, v1.z + 0.03);
-          matchedLines.push(v1.x, v1.y, v1.z + 0.03, v2.x, v2.y, v2.z + 0.03);
-          matchedLines.push(v2.x, v2.y, v2.z + 0.03, v0.x, v0.y, v0.z + 0.03);
+          matchedLines.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z);
+          matchedLines.push(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+          matchedLines.push(v2.x, v2.y, v2.z, v0.x, v0.y, v0.z);
         }
       });
 
@@ -477,6 +568,8 @@ export default function DelaunayConstellation({
     if (templateA && templateA.keypoints.length > 0) {
       const meshNetA = buildDelaunayNetwork(
         templateA,
+        scaleAX,
+        scaleAY,
         -1.65,
         0x06b6d4,
         0x0284c7,
@@ -485,26 +578,32 @@ export default function DelaunayConstellation({
       netGroup.add(meshNetA);
     }
 
-    if (templateB && templateB.keypoints.length > 0) {
+    if (templateB && templateB.keypoints.length > 0 && netGroupB) {
       const meshNetB = buildDelaunayNetwork(
         templateB,
-        1.65,
+        scaleBX,
+        scaleBY,
+        0.0,
         0xf43f5e,
         0xe11d48,
         matchedPairs.map((p) => p.vertices_b)
       );
-      netGroup.add(meshNetB);
+      netGroupB.add(meshNetB);
     }
 
     if (matchedPairs.length > 0 && templateA && templateB) {
-      const wA = templateA.width || 565;
-      const hA = templateA.height || 584;
-      const wB = templateB.width || 565;
-      const hB = templateB.height || 584;
-
       matchedPairs.forEach((pair) => {
-        const pA = mapPixelTo3D(pair.centroid_a[0], pair.centroid_a[1], wA, hA, -1.65);
-        const pB = mapPixelTo3D(pair.centroid_b[0], pair.centroid_b[1], wB, hB, 1.65);
+        const pA = mapPixelToLocal3D(pair.centroid_a[0], pair.centroid_a[1], wA, hA, scaleAX, scaleAY, -1.65, 0.025);
+        const localPtB = mapPixelToLocal3D(pair.centroid_b[0], pair.centroid_b[1], wB, hB, scaleBX, scaleBY, 0.0, 0.025);
+        
+        let pB = localPtB;
+        if (planeBGroupRef.current && mainGroupRef.current) {
+          planeBGroupRef.current.updateMatrixWorld();
+          const worldPtB = planeBGroupRef.current.localToWorld(localPtB.clone());
+          pB = mainGroupRef.current.worldToLocal(worldPtB);
+        }
+        pA.z = 0.025;
+        pB.z = 0.025;
         const mid = pA.clone().add(pB).multiplyScalar(0.5);
         mid.z += 0.55;
 
@@ -519,7 +618,7 @@ export default function DelaunayConstellation({
         netGroup.add(new THREE.Line(arcGeo, arcMat));
       });
     }
-  }, [templateA, templateB, matchedPairs, isMatch]);
+  }, [templateA, templateB, matchedPairs, isMatch, scanADimensions, scanBDimensions]);
 
   return (
     <div className="relative w-full h-full min-h-[500px] flex items-center justify-center overflow-hidden select-none">

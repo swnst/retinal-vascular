@@ -100,13 +100,16 @@ class CombinedLoss(nn.Module):
         self.bce_weight = bce_weight
         self.dice_weight = dice_weight
         self.cldice_weight = cldice_weight
-        p_weight = torch.tensor([pos_weight]) if pos_weight is not None else None
-        self.bce = nn.BCEWithLogitsLoss(pos_weight=p_weight)
+        if pos_weight is not None:
+            self.register_buffer("pos_weight", torch.tensor([pos_weight], dtype=torch.float32))
+        else:
+            self.pos_weight = None
         self.dice = DiceLoss(smooth=smooth)
         self.cldice = SoftClDiceLoss(num_iter=10, smooth=smooth)
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        bce_loss = self.bce(logits, targets)
+        p_weight = self.pos_weight.to(logits.device) if self.pos_weight is not None else None
+        bce_loss = F.binary_cross_entropy_with_logits(logits, targets, pos_weight=p_weight)
         dice_loss = self.dice(logits, targets)
         if self.cldice_weight > 0.0:
             cldice_loss = self.cldice(logits, targets)
@@ -288,6 +291,7 @@ def train_model(
     """
     device_obj = torch.device(device)
     model.to(device_obj)
+    criterion = criterion.to(device_obj)
 
     checkpoint_file = Path(checkpoint_path)
     checkpoint_file.parent.mkdir(parents=True, exist_ok=True)

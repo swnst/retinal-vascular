@@ -40,6 +40,9 @@ wandb/
 
 # --- Heavy Binary Visualization Outputs ---
 results/vessel_prediction_samples.png
+results/figures/
+results/*.html
+results/drive_uploaded_figures.json
 results/localization/visualizations/
 *.png.bak
 
@@ -53,3 +56,4 @@ results/localization/visualizations/
 .ruff_cache/
 .coverage
 htmlcov/
+scratch/

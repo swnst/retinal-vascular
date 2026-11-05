@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from classical_pipeline.localization_api import find_fovea, find_optic_disk
 
@@ -38,3 +39,42 @@ def test_find_optic_disk_rgb_input():
     od_x, od_y = find_optic_disk(vessel, color)
     assert 0 <= od_x < w
     assert 0 <= od_y < h
+
+
+def test_find_optic_disk_uint16_rgb_over_255():
+    h, w = 180, 180
+    color_u16 = np.full((h, w, 3), 10000, dtype=np.uint16)
+    color_u16[80:100, 80:100] = 55000
+
+    vessel = np.zeros((h, w), dtype=np.uint8)
+    vessel[90, 40:140] = 1
+
+    od_x, od_y = find_optic_disk(vessel, color_u16)
+    assert 0 <= od_x < w
+    assert 0 <= od_y < h
+
+
+def test_find_optic_disk_additional_dtypes():
+    h, w = 150, 150
+    vessel = np.zeros((h, w), dtype=np.uint8)
+    vessel[75, 20:130] = 1
+
+    gray_u16_high = np.full((h, w), 50000, dtype=np.uint16)
+    gray_u16_high[70:80, 70:80] = 65000
+    od_x1, od_y1 = find_optic_disk(vessel, gray_u16_high)
+    assert 0 <= od_x1 < w
+    assert 0 <= od_y1 < h
+
+    f32_01 = np.full((h, w, 3), 0.4, dtype=np.float32)
+    f32_01[70:80, 70:80] = 0.95
+    od_x2, od_y2 = find_optic_disk(vessel, f32_01)
+    assert 0 <= od_x2 < w
+    assert 0 <= od_y2 < h
+
+    bool_3d = np.ones((h, w, 3), dtype=np.bool_)
+    with pytest.raises(TypeError):
+        find_optic_disk(vessel, bool_3d)
+
+    neg_float = np.full((h, w), -0.5, dtype=np.float32)
+    with pytest.raises(ValueError):
+        find_optic_disk(vessel, neg_float)

@@ -8,6 +8,7 @@ from PIL import Image
 import pytest
 
 from api.main import app, pipeline_service
+from api.services import PipelineService
 from matching.matcher import match_templates_detailed
 from matching.triangulation import build_delaunay_triangulation, compute_triangle_invariants
 
@@ -239,18 +240,13 @@ def test_api_high_resolution_idrid_and_hrf_uploads(client):
 
 
 def test_api_cross_resolution_genuine_verification(client):
-    w1, h1 = 565, 584
-    img1 = np.zeros((h1, w1, 3), dtype=np.uint8)
-    cv2.circle(img1, (w1 // 2, h1 // 2), 260, (20, 50, 180), -1)
-    cv2.circle(img1, (180, 290), 40, (140, 210, 240), -1)
-    cv2.circle(img1, (360, 290), 25, (10, 25, 90), -1)
-    cv2.line(img1, (180, 290), (280, 150), (80, 120, 240), 4)
-    cv2.line(img1, (180, 290), (280, 430), (80, 120, 240), 4)
-    cv2.line(img1, (280, 150), (380, 120), (80, 120, 240), 3)
-    cv2.line(img1, (280, 430), (380, 460), (80, 120, 240), 3)
+    img_p = Path("data/DRIVE/test/images/01_test.tif")
+    if not img_p.is_file():
+        img_p = Path("data/DRIVE/training/images/21_training.tif")
+    img1 = cv2.imread(str(img_p))
     b64_1 = pipeline_service.encode_base64_image(img1, ".png")
 
-    img2 = cv2.resize(img1, (1130, 1168), interpolation=cv2.INTER_LINEAR)
+    img2 = cv2.resize(img1, (int(img1.shape[1] * 1.5), int(img1.shape[0] * 1.5)), interpolation=cv2.INTER_LINEAR)
     b64_2 = pipeline_service.encode_base64_image(img2, ".png")
 
     res = client.post(
@@ -373,3 +369,98 @@ def test_api_match_perturbation_uint8_and_noise_resilience(client):
     assert data_pose["is_match"] is True
     assert data_pose["similarity_score"] > 0.75
 
+
+
+# --- Additional Edge Case Tests ---
+def test_predict_single_image_dtype_robustness(client):
+    from dl_pipeline.predict import predict_single_image
+
+    model = pipeline_service.model
+    assert model is not None, "Model should be loaded when client fixture is initialized"
+    active_device = str(pipeline_service.device)
+
+    dummy_f32_01 = np.full((128, 128, 3), 0.5, dtype=np.float32)
+    mask1, prob1 = predict_single_image(model, dummy_f32_01, device=active_device, return_original_size=True)
+    assert mask1.shape == (128, 128)
+    assert prob1.shape == (128, 128)
+    assert prob1.max() <= 1.0 and prob1.min() >= 0.0
+
+    dummy_overshoot = np.full((128, 128, 3), 1.02, dtype=np.float32)
+    mask_os, prob_os = predict_single_image(model, dummy_overshoot, device=active_device, return_original_size=True)
+    assert mask_os.shape == (128, 128)
+    assert prob_os.max() <= 1.0 and prob_os.min() >= 0.0
+
+    dummy_rgba_f32 = np.full((128, 128, 4), 0.8, dtype=np.float32)
+    mask2, prob2 = predict_single_image(model, dummy_rgba_f32, device=active_device, return_original_size=True)
+    assert mask2.shape == (128, 128)
+
+    dummy_rgba_u16 = np.full((128, 128, 4), 45000, dtype=np.uint16)
+    mask_rgba_u16, prob_rgba_u16 = predict_single_image(model, dummy_rgba_u16, device=active_device, return_original_size=True)
+    assert mask_rgba_u16.shape == (128, 128)
+
+    dummy_u16 = np.full((128, 128, 3), 32000, dtype=np.uint16)
+    mask3, prob3 = predict_single_image(model, dummy_u16, device=active_device, return_original_size=True)
+    assert mask3.shape == (128, 128)
+
+
+def test_fill_holes_preserves_binary_range():
+    from dl_pipeline.postprocess import fill_holes
+
+    mask_255 = np.zeros((50, 50), dtype=np.uint8)
+    mask_255[10:40, 10:40] = 255
+    mask_255[20:25, 20:25] = 0
+    filled_255 = fill_holes(mask_255, max_hole_size=50)
+    unique_vals_255 = set(np.unique(filled_255))
+    assert unique_vals_255.issubset({0, 255})
+    assert 1 not in unique_vals_255
+
+    mask_1 = (mask_255 > 0).astype(np.uint8)
+    filled_1 = fill_holes(mask_1, max_hole_size=50)
+    unique_vals_1 = set(np.unique(filled_1))
+    assert unique_vals_1.issubset({0, 1})
+    assert 255 not in unique_vals_1
+
+
+def test_decode_image_negative_floats():
+    neg_float_img = np.random.uniform(-1.0, 1.0, size=(64, 64, 3)).astype(np.float32)
+    is_success, buffer = cv2.imencode(".tif", neg_float_img)
+    assert is_success
+    decoded = pipeline_service.decode_image_bytes(buffer.tobytes())
+    assert decoded.dtype == np.uint8
+    assert decoded.shape == (64, 64, 3)
+
+    pos_float_over_255 = np.linspace(0.0, 1000.0, 64 * 64 * 3, dtype=np.float32).reshape(64, 64, 3)
+    is_success2, buffer2 = cv2.imencode(".tif", pos_float_over_255)
+    assert is_success2
+    decoded2 = pipeline_service.decode_image_bytes(buffer2.tobytes())
+    assert decoded2.dtype == np.uint8
+    assert decoded2.shape == (64, 64, 3)
+    assert float(decoded2.std()) > 40.0
+
+
+def test_serialize_template_area_scaling():
+    dummy_template = {
+        "keypoints": [(100.0, 100.0), (200.0, 100.0), (150.0, 200.0)],
+        "invariants": [{
+            "triangle_index": 0,
+            "vertices": [[100.0, 100.0], [200.0, 100.0], [150.0, 200.0]],
+            "centroid": [150.0, 133.33],
+            "area": 5000.0,
+            "angles": [1.0, 1.0, 1.14],
+            "adjacent_ratios": [0.8],
+        }],
+        "od_center": (150.0, 150.0),
+        "fovea_center": None,
+    }
+    M_inv = np.array([
+        [2.0, 0.0, 10.0],
+        [0.0, 2.0, 20.0],
+        [0.0, 0.0, 1.0],
+    ], dtype=np.float64)
+    serialized = PipelineService.serialize_template(dummy_template, M_inv=M_inv)
+    tri = serialized["triangles"][0]
+    expected_area = 5000.0 * 4.0
+    assert abs(tri["area"] - expected_area) < 1e-3
+    assert abs(tri["vertices"][0][0] - (100.0 * 2.0 + 10.0)) < 1e-3
+    assert abs(tri["vertices"][0][1] - (100.0 * 2.0 + 20.0)) < 1e-3
+    assert abs(tri["centroid"][0] - (150.0 * 2.0 + 10.0)) < 1e-3

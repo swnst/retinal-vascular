@@ -10,15 +10,15 @@ import {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // --- API Client Handlers ---
-export async function fetchHealth(): Promise<{ status: string; device: string; model_loaded: boolean }> {
-  const res = await fetch(`${API_BASE}/api/v1/health`, { cache: "no-store" });
+export async function fetchHealth(signal?: AbortSignal): Promise<{ status: string; device: string; model_loaded: boolean }> {
+  const res = await fetch(`${API_BASE}/api/v1/health`, { cache: "no-store", signal });
   if (!res.ok) throw new Error("API server is offline");
   return res.json();
 }
 
-export async function fetchPresets(): Promise<PresetItem[]> {
+export async function fetchPresets(signal?: AbortSignal): Promise<PresetItem[]> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/presets`, { cache: "no-store" });
+    const res = await fetch(`${API_BASE}/api/v1/presets`, { cache: "no-store", signal });
     if (!res.ok) return [];
     return res.json();
   } catch {
@@ -33,6 +33,7 @@ export async function requestSegmentation(
   minSize: number = 25,
   maxHoleSize: number = 15,
   useTta: boolean = true,
+  signal?: AbortSignal,
 ): Promise<SegmentationResult> {
   const res = await fetch(`${API_BASE}/api/v1/segment`, {
     method: "POST",
@@ -45,6 +46,7 @@ export async function requestSegmentation(
       max_hole_size: maxHoleSize,
       use_tta: useTta,
     }),
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Segmentation failed" }));
@@ -55,7 +57,8 @@ export async function requestSegmentation(
 
 export async function requestLocalization(
   imageBase64: string,
-  vesselMaskBase64?: string
+  vesselMaskBase64?: string,
+  signal?: AbortSignal,
 ): Promise<LocalizationResult> {
   const res = await fetch(`${API_BASE}/api/v1/localize`, {
     method: "POST",
@@ -64,6 +67,7 @@ export async function requestLocalization(
       image_base64: imageBase64,
       vessel_mask_base64: vesselMaskBase64,
     }),
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Localization failed" }));
@@ -81,6 +85,7 @@ export async function requestMatch(
   scaleFactorB: number = 1.0,
   brightnessB: number = 1.0,
   additionalPerturbations?: Partial<PerturbationParams>,
+  signal?: AbortSignal,
 ): Promise<MatchResult> {
   const payload = {
     image_a_base64: imageABase64,
@@ -104,6 +109,7 @@ export async function requestMatch(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Biometric matching failed" }));
@@ -112,7 +118,11 @@ export async function requestMatch(
   return res.json();
 }
 
-export async function uploadClinicalImage(file: File, maxDim: number = 768): Promise<NormalizedImageResult> {
+export async function uploadClinicalImage(
+  file: File,
+  maxDim: number = 768,
+  signal?: AbortSignal,
+): Promise<NormalizedImageResult> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("max_dim", maxDim.toString());
@@ -120,10 +130,32 @@ export async function uploadClinicalImage(file: File, maxDim: number = 768): Pro
   const res = await fetch(`${API_BASE}/api/v1/upload-image`, {
     method: "POST",
     body: formData,
+    signal,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Image upload failed" }));
     throw new Error(err.detail || "Image upload failed");
+  }
+  return res.json();
+}
+
+export async function normalizeClinicalImageBase64(
+  imageBase64: string,
+  maxDim: number = 768,
+  signal?: AbortSignal,
+): Promise<NormalizedImageResult> {
+  const res = await fetch(`${API_BASE}/api/v1/normalize-image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_base64: imageBase64,
+      max_dim: maxDim,
+    }),
+    signal,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Image normalization failed" }));
+    throw new Error(err.detail || "Image normalization failed");
   }
   return res.json();
 }

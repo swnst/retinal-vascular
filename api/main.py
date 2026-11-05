@@ -1,5 +1,7 @@
 import base64
+import logging
 from pathlib import Path
+import threading
 from fastapi import FastAPI, HTTPException, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
@@ -49,6 +51,7 @@ async def health_check():
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _CACHED_PRESETS: list[PresetItem] | None = None
+_PRESETS_LOCK = threading.Lock()
 
 
 @app.get("/api/v1/presets", response_model=list[PresetItem])
@@ -57,158 +60,162 @@ def get_presets():
     if _CACHED_PRESETS is not None:
         return _CACHED_PRESETS
 
-    presets = []
-    base_dir = PROJECT_ROOT / "data"
+    with _PRESETS_LOCK:
+        if _CACHED_PRESETS is not None:
+            return _CACHED_PRESETS
 
-    drive_training_dir = base_dir / "DRIVE" / "training" / "images"
-    drive_test_dir = base_dir / "DRIVE" / "test" / "images"
-    drive_images: list[Path] = []
-    for d in [drive_training_dir, drive_test_dir]:
-        if d.exists():
-            drive_images.extend(sorted(list(d.glob("*.tif")) + list(d.glob("*.png"))))
+        presets = []
+        base_dir = PROJECT_ROOT / "data"
 
-    def load_b64(path: Path | None) -> tuple[str, str]:
-        if path is None or not path.exists():
-            return "", ""
-        img = cv2.imread(str(path))
-        if img is None:
-            return "", ""
-        h, w = img.shape[:2]
-        if max(h, w) > 1000:
-            scale = 768.0 / max(h, w)
-            img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-        thumb = cv2.resize(img, (160, 160), interpolation=cv2.INTER_AREA)
-        return (
-            pipeline_service.encode_base64_image(img, ".png"),
-            pipeline_service.encode_base64_image(thumb, ".jpeg"),
-        )
+        drive_training_dir = base_dir / "DRIVE" / "training" / "images"
+        drive_test_dir = base_dir / "DRIVE" / "test" / "images"
+        drive_images: list[Path] = []
+        for d in [drive_training_dir, drive_test_dir]:
+            if d.exists():
+                drive_images.extend(sorted(list(d.glob("*.tif")) + list(d.glob("*.png"))))
 
-    img_21_path = next((p for p in drive_images if "21" in p.name or "01" in p.name), None)
-    img_22_path = next((p for p in drive_images if "22" in p.name or "02" in p.name), None)
-    img_23_path = next((p for p in drive_images if "23" in p.name or "03" in p.name), None)
-    img_24_path = next((p for p in drive_images if "24" in p.name or "04" in p.name), None)
+        def load_b64(path: Path | None) -> tuple[str, str]:
+            if path is None or not path.exists():
+                return "", ""
+            img = cv2.imread(str(path))
+            if img is None:
+                return "", ""
+            h, w = img.shape[:2]
+            if max(h, w) > 1000:
+                scale = 768.0 / max(h, w)
+                img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            thumb = cv2.resize(img, (160, 160), interpolation=cv2.INTER_AREA)
+            return (
+                pipeline_service.encode_base64_image(img, ".png"),
+                pipeline_service.encode_base64_image(thumb, ".jpeg"),
+            )
 
-    hrf_dir = base_dir / "HRF" / "images"
-    hrf_path = None
-    if hrf_dir.exists():
-        hrf_candidates = list(hrf_dir.glob("*_dr.JPG")) + list(hrf_dir.glob("*_dr.jpg")) + list(hrf_dir.glob("*.jpg"))
-        if hrf_candidates:
-            hrf_path = hrf_candidates[0]
+        img_21_path = next((p for p in drive_images if "21" in p.name or "01" in p.name), None)
+        img_22_path = next((p for p in drive_images if "22" in p.name or "02" in p.name), None)
+        img_23_path = next((p for p in drive_images if "23" in p.name or "03" in p.name), None)
+        img_24_path = next((p for p in drive_images if "24" in p.name or "04" in p.name), None)
 
-    b64_21, thumb_21 = load_b64(img_21_path)
-    b64_22, thumb_22 = load_b64(img_22_path)
-    b64_23, thumb_23 = load_b64(img_23_path)
-    b64_24, thumb_24 = load_b64(img_24_path)
-    b64_hrf, thumb_hrf = load_b64(hrf_path) if hrf_path else (b64_21, thumb_21)
+        hrf_dir = base_dir / "HRF" / "images"
+        hrf_path = None
+        if hrf_dir.exists():
+            hrf_candidates = list(hrf_dir.glob("*_dr.JPG")) + list(hrf_dir.glob("*_dr.jpg")) + list(hrf_dir.glob("*.jpg"))
+            if hrf_candidates:
+                hrf_path = hrf_candidates[0]
 
-    # --- Step 1: Ocular Anatomy & Vessel Stage Presets ---
-    presets.append(PresetItem(
-        id="ocular_healthy_01",
-        title="Macula-Centered Baseline",
-        description="Healthy fundus scan demonstrating clear Optic Disc convergence and avascular Fovea depression.",
-        dataset="DRIVE",
-        scenario="clinical",
-        target_stage="ocular",
-        badge_label="Normal Anatomy",
-        image_base64=b64_21,
-        image_b_base64=None,
-        thumbnail_base64=thumb_21,
-    ))
+        b64_21, thumb_21 = load_b64(img_21_path)
+        b64_22, thumb_22 = load_b64(img_22_path)
+        b64_23, thumb_23 = load_b64(img_23_path)
+        b64_24, thumb_24 = load_b64(img_24_path)
+        b64_hrf, thumb_hrf = load_b64(hrf_path) if hrf_path else (b64_21, thumb_21)
 
-    presets.append(PresetItem(
-        id="ocular_dense_24",
-        title="High-Density Microvasculature",
-        description="High-density vascular tree (12.7% vessel density) ideal for 3D shader relief extrusion and exploded skeleton layers.",
-        dataset="DRIVE",
-        scenario="dense_clinical",
-        target_stage="ocular",
-        badge_label="Rich Arcade Mesh",
-        image_base64=b64_24,
-        image_b_base64=None,
-        thumbnail_base64=thumb_24,
-    ))
+        # --- Step 1: Ocular Anatomy & Vessel Stage Presets ---
+        presets.append(PresetItem(
+            id="ocular_healthy_01",
+            title="Macula-Centered Baseline",
+            description="Healthy fundus scan demonstrating clear Optic Disc convergence and avascular Fovea depression.",
+            dataset="DRIVE",
+            scenario="clinical",
+            target_stage="ocular",
+            badge_label="Normal Anatomy",
+            image_base64=b64_21,
+            image_b_base64=None,
+            thumbnail_base64=thumb_21,
+        ))
 
-    presets.append(PresetItem(
-        id="ocular_sparse_23",
-        title="Low-Caliber Peripheral Tree",
-        description="Sparse/faint vascular network (7.8% density) for testing U-Net probability threshold sensitivity and gap filling.",
-        dataset="DRIVE",
-        scenario="sparse_clinical",
-        target_stage="ocular",
-        badge_label="Attenuated Vessels",
-        image_base64=b64_23,
-        image_b_base64=None,
-        thumbnail_base64=thumb_23,
-    ))
+        presets.append(PresetItem(
+            id="ocular_dense_24",
+            title="High-Density Microvasculature",
+            description="High-density vascular tree (12.7% vessel density) ideal for 3D shader relief extrusion and exploded skeleton layers.",
+            dataset="DRIVE",
+            scenario="dense_clinical",
+            target_stage="ocular",
+            badge_label="Rich Arcade Mesh",
+            image_base64=b64_24,
+            image_b_base64=None,
+            thumbnail_base64=thumb_24,
+        ))
 
-    presets.append(PresetItem(
-        id="ocular_pathology_dr",
-        title="Pathological Fundus (HRF)",
-        description="Clinical fundus scan (Diabetic Retinopathy) testing landmark localization under pathological lesions and media shifts.",
-        dataset="HRF",
-        scenario="clinical",
-        target_stage="ocular",
-        badge_label="Clinical Pathology",
-        image_base64=b64_hrf,
-        image_b_base64=None,
-        thumbnail_base64=thumb_hrf,
-    ))
+        presets.append(PresetItem(
+            id="ocular_sparse_23",
+            title="Low-Caliber Peripheral Tree",
+            description="Sparse/faint vascular network (7.8% density) for testing U-Net probability threshold sensitivity and gap filling.",
+            dataset="DRIVE",
+            scenario="sparse_clinical",
+            target_stage="ocular",
+            badge_label="Attenuated Vessels",
+            image_base64=b64_23,
+            image_b_base64=None,
+            thumbnail_base64=thumb_23,
+        ))
 
-    # --- Step 2: Biometric Identity Comparison Stage Presets ---
-    presets.append(PresetItem(
-        id="match_genuine_01",
-        title="Subject 01 Genuine Pair",
-        description="Same retina for testing positive biometric verification across all 11 interactive perturbation controls.",
-        dataset="DRIVE",
-        scenario="genuine",
-        target_stage="matching",
-        badge_label="Same Person",
-        image_base64=b64_21,
-        image_b_base64=b64_21,
-        thumbnail_base64=thumb_21,
-    ))
+        presets.append(PresetItem(
+            id="ocular_pathology_dr",
+            title="Pathological Fundus (HRF)",
+            description="Clinical fundus scan (Diabetic Retinopathy) testing landmark localization under pathological lesions and media shifts.",
+            dataset="HRF",
+            scenario="clinical",
+            target_stage="ocular",
+            badge_label="Clinical Pathology",
+            image_base64=b64_hrf,
+            image_b_base64=None,
+            thumbnail_base64=thumb_hrf,
+        ))
 
-    presets.append(PresetItem(
-        id="match_impostor_01",
-        title="Subject 01 vs Subject 02",
-        description="Distinct individuals to benchmark zero false-acceptance biometric spoofing defense.",
-        dataset="DRIVE",
-        scenario="impostor",
-        target_stage="matching",
-        badge_label="Impostor Test",
-        image_base64=b64_21,
-        image_b_base64=b64_22,
-        thumbnail_base64=thumb_22,
-    ))
+        # --- Step 2: Biometric Identity Comparison Stage Presets ---
+        presets.append(PresetItem(
+            id="match_genuine_01",
+            title="Subject 01 Genuine Pair",
+            description="Same retina for testing positive biometric verification across all 11 interactive perturbation controls.",
+            dataset="DRIVE",
+            scenario="genuine",
+            target_stage="matching",
+            badge_label="Same Person",
+            image_base64=b64_21,
+            image_b_base64=b64_21,
+            thumbnail_base64=thumb_21,
+        ))
 
-    presets.append(PresetItem(
-        id="match_sparse_23",
-        title="Subject 23 Low-Node Pair",
-        description="Same subject with only 34 bifurcation nodes testing Delaunay graph stability under sparse keypoints.",
-        dataset="DRIVE",
-        scenario="sparse_clinical",
-        target_stage="matching",
-        badge_label="Sparse Graph",
-        image_base64=b64_23,
-        image_b_base64=b64_23,
-        thumbnail_base64=thumb_23,
-    ))
+        presets.append(PresetItem(
+            id="match_impostor_01",
+            title="Subject 01 vs Subject 02",
+            description="Distinct individuals to benchmark zero false-acceptance biometric spoofing defense.",
+            dataset="DRIVE",
+            scenario="impostor",
+            target_stage="matching",
+            badge_label="Impostor Test",
+            image_base64=b64_21,
+            image_b_base64=b64_22,
+            thumbnail_base64=thumb_22,
+        ))
 
-    presets.append(PresetItem(
-        id="match_dense_24",
-        title="Subject 24 High-Node Pair",
-        description="Same subject with 142 Delaunay triangles testing Hungarian bipartite assignment in crowded topologies.",
-        dataset="DRIVE",
-        scenario="dense_clinical",
-        target_stage="matching",
-        badge_label="Dense Graph",
-        image_base64=b64_24,
-        image_b_base64=b64_24,
-        thumbnail_base64=thumb_24,
-    ))
+        presets.append(PresetItem(
+            id="match_sparse_23",
+            title="Subject 23 Low-Node Pair",
+            description="Same subject with only 34 bifurcation nodes testing Delaunay graph stability under sparse keypoints.",
+            dataset="DRIVE",
+            scenario="sparse_clinical",
+            target_stage="matching",
+            badge_label="Sparse Graph",
+            image_base64=b64_23,
+            image_b_base64=b64_23,
+            thumbnail_base64=thumb_23,
+        ))
 
-    _CACHED_PRESETS = presets
-    return presets
+        presets.append(PresetItem(
+            id="match_dense_24",
+            title="Subject 24 High-Node Pair",
+            description="Same subject with 142 Delaunay triangles testing Hungarian bipartite assignment in crowded topologies.",
+            dataset="DRIVE",
+            scenario="dense_clinical",
+            target_stage="matching",
+            badge_label="Dense Graph",
+            image_base64=b64_24,
+            image_b_base64=b64_24,
+            thumbnail_base64=thumb_24,
+        ))
+
+        _CACHED_PRESETS = presets
+        return presets
 
 
 @app.post("/api/v1/segment", response_model=SegmentationResponse)
@@ -235,8 +242,11 @@ def segment_endpoint(req: SegmentationRequest):
             width=w,
             height=h,
         )
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.exception(f"Internal processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 @app.post("/api/v1/localize", response_model=LocalizationResponse)
@@ -262,8 +272,11 @@ def localize_endpoint(req: LocalizationRequest):
             width=w,
             height=h,
         )
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.exception(f"Internal processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 @app.post("/api/v1/match", response_model=MatchResponse)
@@ -289,8 +302,11 @@ def match_endpoint(req: MatchRequest):
             elastic_alpha_b=req.elastic_alpha_b,
         )
         return MatchResponse(**result)
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.exception(f"Internal processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 @app.post("/api/v1/upload-image", response_model=NormalizeImageResponse)
@@ -308,8 +324,11 @@ async def upload_image_endpoint(
             filename=file.filename or "uploaded_scan",
         )
         return NormalizeImageResponse(**result)
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.exception(f"Internal processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 @app.post("/api/v1/normalize-image", response_model=NormalizeImageResponse)
@@ -322,8 +341,11 @@ def normalize_image_endpoint(req: NormalizeImageRequest):
             max_dim=req.max_dim,
         )
         return NormalizeImageResponse(**result)
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.exception(f"Internal processing error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 if __name__ == "__main__":

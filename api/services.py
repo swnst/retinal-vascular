@@ -81,9 +81,42 @@ class PipelineService:
             scale_factor = 257.0 if max_val > 4095 else (max(1.0, max_val) / 255.0)
             img = np.clip(img.astype(np.float32) / scale_factor, 0, 255).astype(np.uint8)
         elif np.issubdtype(img.dtype, np.floating):
-            max_val = float(np.max(img))
-            multiplier = 255.0 if max_val <= 1.0 else 1.0
-            img = np.clip(img.astype(np.float32) * multiplier, 0, 255).astype(np.uint8)
+            if img.ndim == 3 and img.shape[2] == 4:
+                color_ch = img[:, :, :3].astype(np.float32)
+                alpha_ch = img[:, :, 3].astype(np.float32)
+
+                min_c = float(np.min(color_ch))
+                max_c = float(np.max(color_ch))
+                if min_c < 0.0:
+                    rng = max(1e-6, max_c - min_c)
+                    color_norm = np.clip((color_ch - min_c) / rng * 255.0, 0, 255)
+                elif max_c <= 1.05:
+                    color_norm = np.clip(color_ch * 255.0, 0, 255)
+                elif max_c > 255.0:
+                    color_norm = np.clip(color_ch * (255.0 / max_c), 0, 255)
+                else:
+                    color_norm = np.clip(color_ch, 0, 255)
+
+                max_a = float(np.max(alpha_ch))
+                if max_a > 1.05:
+                    alpha_norm = np.clip(alpha_ch / max(255.0, max_a), 0.0, 1.0)
+                else:
+                    alpha_norm = np.clip(alpha_ch, 0.0, 1.0)
+
+                img = np.clip(color_norm * alpha_norm[:, :, None], 0, 255).astype(np.uint8)
+            else:
+                color_ch = img.astype(np.float32)
+                min_c = float(np.min(color_ch))
+                max_c = float(np.max(color_ch))
+                if min_c < 0.0:
+                    rng = max(1e-6, max_c - min_c)
+                    img = np.clip((color_ch - min_c) / rng * 255.0, 0, 255).astype(np.uint8)
+                elif max_c <= 1.05:
+                    img = np.clip(color_ch * 255.0, 0, 255).astype(np.uint8)
+                elif max_c > 255.0:
+                    img = np.clip(color_ch * (255.0 / max_c), 0, 255).astype(np.uint8)
+                else:
+                    img = np.clip(color_ch, 0, 255).astype(np.uint8)
 
         if img.ndim == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -473,6 +506,104 @@ class PipelineService:
         )
         return template, vessel_mask, prob_map, skeleton, M_inv
 
+    @staticmethod
+    def serialize_template(
+        tmpl: dict[str, Any],
+        v_mask: np.ndarray | None = None,
+        p_map: np.ndarray | None = None,
+        s_mask: np.ndarray | None = None,
+        M_inv: np.ndarray | None = None,
+        orig_shape: tuple[int, int] | None = None,
+    ) -> dict[str, Any]:
+        if orig_shape is not None:
+            orig_h, orig_w = orig_shape
+        elif v_mask is not None:
+            orig_h, orig_w = v_mask.shape[:2]
+        elif "image_size" in tmpl:
+            orig_h, orig_w = int(tmpl["image_size"][0]), int(tmpl["image_size"][1])
+        else:
+            orig_h, orig_w = 584, 565
+
+        is_transformed = False
+        det_scale = 1.0
+        if M_inv is not None:
+            is_transformed = not np.allclose(M_inv[:2], np.eye(2, 3), atol=1e-4)
+            det_scale = abs(float(np.linalg.det(M_inv[:2, :2])))
+
+        def map_pt(x: float, y: float) -> tuple[float, float]:
+            if not is_transformed or M_inv is None:
+                return float(x), float(y)
+            mapped = M_inv[:2, :2] @ np.array([x, y], dtype=np.float64) + M_inv[:2, 2]
+            return float(mapped[0]), float(mapped[1])
+
+        keypoints = []
+        for pt in tmpl.get("keypoints", []):
+            if isinstance(pt, dict):
+                px, py = pt.get("x", 0.0), pt.get("y", 0.0)
+            else:
+                px, py = pt[0], pt[1]
+            mx, my = map_pt(px, py)
+            keypoints.append({"x": mx, "y": my})
+
+        triangles = []
+        for inv in tmpl.get("invariants", []):
+            t_idx = int(inv.get("triangle_index", inv.get("triangle_idx", 0)))
+            verts = inv.get("vertices", [])
+            mapped_verts = [list(map_pt(vx, vy)) for vx, vy in verts]
+            centroid = inv.get("centroid", [0.0, 0.0])
+            mcx, mcy = map_pt(centroid[0], centroid[1])
+            triangles.append({
+                "triangle_index": t_idx,
+                "vertices": mapped_verts,
+                "centroid": [mcx, mcy],
+                "adjacent_ratios": [float(r) for r in inv.get("adjacent_ratios", [])],
+                "angles": [float(a) for a in inv.get("angles", [])],
+                "area": float(inv.get("area", 0.0)) * det_scale,
+            })
+
+        od = None
+        if tmpl.get("od_center"):
+            od_x, od_y = map_pt(tmpl["od_center"][0], tmpl["od_center"][1])
+            od = {"x": od_x, "y": od_y}
+
+        fov = None
+        if tmpl.get("fovea_center"):
+            fov_x, fov_y = map_pt(tmpl["fovea_center"][0], tmpl["fovea_center"][1])
+            fov = {"x": fov_x, "y": fov_y}
+
+        if v_mask is not None and p_map is not None and s_mask is not None:
+            if is_transformed and M_inv is not None:
+                v_disp = cv2.warpAffine(v_mask, M_inv[:2], (orig_w, orig_h), flags=cv2.INTER_NEAREST)
+                p_disp = cv2.warpAffine(p_map, M_inv[:2], (orig_w, orig_h), flags=cv2.INTER_LINEAR)
+                s_disp = cv2.warpAffine(s_mask, M_inv[:2], (orig_w, orig_h), flags=cv2.INTER_NEAREST)
+            else:
+                v_disp, p_disp, s_disp = v_mask, p_map, s_mask
+
+            v_b64 = PipelineService.encode_base64_image(v_disp)
+            p_b64 = PipelineService.encode_base64_image(p_disp)
+            s_b64 = PipelineService.encode_base64_image(s_disp)
+        else:
+            v_b64 = tmpl.get("vessel_mask_base64", "")
+            p_b64 = tmpl.get("prob_map_base64", "")
+            s_b64 = tmpl.get("skeleton_base64", "")
+
+        num_kp = tmpl.get("num_keypoints", len(keypoints))
+        num_tri = tmpl.get("delaunay_triangles", tmpl.get("num_triangles", len(triangles)))
+
+        return {
+            "num_keypoints": int(num_kp),
+            "num_triangles": int(num_tri),
+            "keypoints": keypoints,
+            "triangles": triangles,
+            "od_center": od,
+            "fovea_center": fov,
+            "vessel_mask_base64": v_b64,
+            "prob_map_base64": p_b64,
+            "skeleton_base64": s_b64,
+            "width": orig_w,
+            "height": orig_h,
+        }
+
     def match_identities(
         self,
         bgr_image_a: np.ndarray,
@@ -536,74 +667,6 @@ class PipelineService:
         is_match = verify_identity(score, threshold=0.20)
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
-        def serialize_template(
-            tmpl: dict[str, Any],
-            v_mask: np.ndarray,
-            p_map: np.ndarray,
-            s_mask: np.ndarray,
-            M_inv: np.ndarray,
-            orig_shape: tuple[int, int],
-        ) -> dict[str, Any]:
-            orig_h, orig_w = orig_shape
-            is_transformed = not np.allclose(M_inv[:2], np.eye(2, 3), atol=1e-4)
-
-            def map_pt(x: float, y: float) -> tuple[float, float]:
-                if not is_transformed:
-                    return x, y
-                mapped = M_inv[:2, :2] @ np.array([x, y], dtype=np.float64) + M_inv[:2, 2]
-                return float(mapped[0]), float(mapped[1])
-
-            keypoints = []
-            for pt in tmpl["keypoints"]:
-                mx, my = map_pt(pt[0], pt[1])
-                keypoints.append({"x": mx, "y": my})
-
-            triangles = []
-            for inv in tmpl.get("invariants", []):
-                t_idx = int(inv.get("triangle_index", inv.get("triangle_idx", 0)))
-                verts = inv.get("vertices", [])
-                mapped_verts = [list(map_pt(vx, vy)) for vx, vy in verts]
-                mcx, mcy = map_pt(inv["centroid"][0], inv["centroid"][1])
-                triangles.append({
-                    "triangle_index": t_idx,
-                    "vertices": mapped_verts,
-                    "centroid": [mcx, mcy],
-                    "adjacent_ratios": [float(r) for r in inv["adjacent_ratios"]],
-                    "angles": [float(a) for a in inv.get("angles", [])],
-                    "area": float(inv["area"]),
-                })
-
-            od = None
-            if tmpl.get("od_center"):
-                od_x, od_y = map_pt(tmpl["od_center"][0], tmpl["od_center"][1])
-                od = {"x": od_x, "y": od_y}
-
-            fov = None
-            if tmpl.get("fovea_center"):
-                fov_x, fov_y = map_pt(tmpl["fovea_center"][0], tmpl["fovea_center"][1])
-                fov = {"x": fov_x, "y": fov_y}
-
-            if is_transformed:
-                v_disp = cv2.warpAffine(v_mask, M_inv[:2], (orig_w, orig_h), flags=cv2.INTER_NEAREST)
-                p_disp = cv2.warpAffine(p_map, M_inv[:2], (orig_w, orig_h), flags=cv2.INTER_LINEAR)
-                s_disp = cv2.warpAffine(s_mask, M_inv[:2], (orig_w, orig_h), flags=cv2.INTER_NEAREST)
-            else:
-                v_disp, p_disp, s_disp = v_mask, p_map, s_mask
-
-            return {
-                "num_keypoints": tmpl["num_keypoints"],
-                "num_triangles": tmpl["delaunay_triangles"],
-                "keypoints": keypoints,
-                "triangles": triangles,
-                "od_center": od,
-                "fovea_center": fov,
-                "vessel_mask_base64": self.encode_base64_image(v_disp),
-                "prob_map_base64": self.encode_base64_image(p_disp),
-                "skeleton_base64": self.encode_base64_image(s_disp),
-                "width": orig_w,
-                "height": orig_h,
-            }
-
         clean_pairs = []
         for pair in match_details["matched_pairs"]:
             p = dict(pair)
@@ -628,8 +691,8 @@ class PipelineService:
             "is_match": bool(is_match),
             "threshold": 0.20,
             "matched_pairs": clean_pairs,
-            "template_a": serialize_template(template_a, vessel_a, prob_a, skel_a, M_inv_a, bgr_image_a.shape[:2]),
-            "template_b": serialize_template(template_b, vessel_b, prob_b, skel_b, M_inv_b, bgr_image_b.shape[:2]),
+            "template_a": self.serialize_template(template_a, vessel_a, prob_a, skel_a, M_inv_a, bgr_image_a.shape[:2]),
+            "template_b": self.serialize_template(template_b, vessel_b, prob_b, skel_b, M_inv_b, bgr_image_b.shape[:2]),
             "perturbed_image_b_base64": self.encode_base64_image(bgr_image_b, ".png"),
             "elapsed_ms": elapsed_ms,
         }
